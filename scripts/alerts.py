@@ -1,0 +1,161 @@
+#!/usr/bin/env python3
+"""
+Oura Alerts - Readiness & Sleep Alerts
+
+Sends Telegram notifications when metrics drop below thresholds.
+"""
+
+import os
+import sys
+import json
+import argparse
+from datetime import datetime, timedelta
+
+try:
+    import requests
+except ImportError:
+    print("Install requests: pip install requests")
+    sys.exit(1)
+
+
+class OuraClient:
+    BASE_URL = "https://api.ouraring.com/v2/usercollection"
+    
+    def __init__(self, token=None):
+        self.token = token or os.environ.get("OURA_API_TOKEN")
+        if not self.token:
+            raise ValueError("OURA_API_TOKEN not set")
+        self.headers = {"Authorization": f"Bearer {self.token}"}
+    
+    def get_sleep(self, start_date, end_date):
+        """Fetch sleep data"""
+        url = f"{self.BASE_URL}/sleep"
+        resp = requests.get(url, headers=self.headers, params={
+            "start_date": start_date,
+            "end_date": end_date
+        })
+        resp.raise_for_status()
+        return resp.json().get("data", [])
+
+
+def seconds_to_hours(seconds):
+    return round(seconds / 3600, 1) if seconds else None
+
+
+def check_thresholds(sleep_data, thresholds):
+    """Check all days against thresholds"""
+    alerts = []
+    
+    for day in sleep_data:
+        date = day.get("day")
+        readiness = day.get("readiness", {}).get("score", 100)
+        efficiency = day.get("efficiency", 100)
+        duration_sec = day.get("total_sleep_duration", 0)
+        duration_hours = seconds_to_hours(duration_sec)
+        
+        day_alerts = []
+        
+        if readiness < thresholds.get("readiness", 60):
+            day_alerts.append(f"Readiness {readiness}")
+        
+        if efficiency < thresholds.get("efficiency", 80):
+            day_alerts.append(f"Efficiency {efficiency}%")
+        
+        if duration_hours and duration_hours < thresholds.get("sleep_hours", 7):
+            day_alerts.append(f"Sleep {duration_hours}h")
+        
+        if day_alerts:
+            alerts.append({"date": date, "alerts": day_alerts})
+    
+    return alerts
+
+
+def format_alert_message(alerts):
+    """Format alerts for Telegram"""
+    if not alerts:
+        return None
+    
+    msg = "⚠️ *Oura Alerts*\n\n"
+    
+    for alert in alerts[-5:]:  # Last 5 alerts
+        msg += f"📅 *{alert['date']}*\n"
+        for a in alert["alerts"]:
+            msg += f"   • {a}\n"
+        msg += "\n"
+    
+    msg += f"_Total: {len(alerts)} alert days_"
+    return msg
+
+
+def send_telegram(message, chat_id=None, bot_token=None):
+    """Send to Telegram"""
+    chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
+    bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    
+    if not chat_id or not bot_token:
+        print("TELEGRAM_CHAT_ID or TELEGRAM_BOT_TOKEN not set")
+        return False
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+    resp = requests.post(url, json=data)
+    return resp.status_code == 200
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Oura Alerts")
+    parser.add_argument("--days", type=int, default=7, help="Check period")
+    parser.add_argument("--readiness", type=int, default=60, help="Readiness threshold")
+    parser.add_argument("--efficiency", type=int, default=80, help="Efficiency threshold")
+    parser.add_argument("--sleep-hours", type=float, default=7, help="Sleep hours threshold")
+    parser.add_argument("--telegram", action="store_true", help="Send to Telegram")
+    parser.add_argument("--token", help="Oura API token")
+    
+    args = parser.parse_args()
+    
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
+    
+    try:
+        client = OuraClient(args.token)
+        sleep = client.get_sleep(start_date, end_date)
+        
+        thresholds = {
+            "readiness": args.readiness,
+            "efficiency": args.efficiency,
+            "sleep_hours": args.sleep_hours
+        }
+        
+        alerts = check_thresholds(sleep, thresholds)
+        
+        if alerts:
+            print(f"\n⚠️  {len(alerts)} Alert Days Found:\n")
+            for alert in alerts:
+                print(f"  {alert['date']}: {', '.join(alert['alerts'])}")
+            
+            if args.telegram:
+                msg = format_alert_message(alerts)
+                if msg and send_telegram(msg):
+                    print("\n✅ Alerts sent to Telegram!")
+                else:
+                    print("\n❌ Telegram failed")
+        else:
+            print(f"\n✅ All metrics above thresholds!")
+            print(f"   Readiness > {args.readiness}")
+            print(f"   Efficiency > {args.efficiency}%")
+            print(f"   Sleep > {args.sleep_hours}h")
+        
+        # Save to file
+        alert_file = f"/home/art/clawd-research/reports/oura_alerts_{end_date}.json"
+        os.makedirs(os.path.dirname(alert_file), exist_ok=True)
+        with open(alert_file, "w") as f:
+            json.dump({"period": f"{start_date} to {end_date}", "alerts": alerts}, f, indent=2)
+        print(f"\n💾 Saved to {alert_file}")
+    
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
