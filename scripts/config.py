@@ -213,35 +213,46 @@ def check_thresholds_with_quality(
     for day in sleep_data:
         date = day.get("day")
         category_issues = []
+        bad_categories = set()
 
         # Check readiness
         readiness_record = readiness_by_day.get(date)
         readiness_score = readiness_record.get("score") if readiness_record else None
         if readiness_score and readiness_score < config.readiness.low_threshold:
             category_issues.append(("readiness", readiness_score))
+            bad_categories.add("readiness")
 
         # Check efficiency
         efficiency = day.get("efficiency", 100)
         if efficiency < config.efficiency.min_efficiency:
             category_issues.append(("efficiency", efficiency))
+            bad_categories.add("efficiency")
 
         # Check sleep duration
         duration_hours = day.get("total_sleep_duration", 0) / 3600
         if duration_hours and duration_hours < config.sleep.min_hours:
             category_issues.append(("sleep", duration_hours))
+            bad_categories.add("sleep")
+
+        # Reset consecutive counter for categories that improved
+        for cat in ["readiness", "efficiency", "sleep"]:
+            if cat not in bad_categories:
+                state.reset_bad_days(cat)
 
         # Apply debounce: require consecutive bad days
         for category, value in category_issues:
-            if category in ["readiness", "efficiency", "sleep"]:
-                state.record_bad_day(category)
+            state.record_bad_day(category)
 
             consecutive = state.get_consecutive_bad_days(category)
             if consecutive < config.consecutive_days_required:
                 continue
 
-            # Check cooldown
-            if not state.should_alert(category, datetime.now()):
-                continue
+            # Check cooldown using config value
+            last_time = state.last_alert_time.get(category)
+            if last_time:
+                cooldown = timedelta(hours=config.cooldown_hours)
+                if (datetime.now() - last_time) < cooldown:
+                    continue
 
             # Create alert message
             if category == "readiness":
