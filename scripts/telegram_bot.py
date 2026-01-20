@@ -14,10 +14,9 @@ Features:
     /alerts - Recent alerts
 """
 
+import logging
 import os
 import sys
-import json
-import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -30,8 +29,6 @@ try:
 except ImportError:
     print("Install python-telegram-bot: pip install python-telegram-bot")
     sys.exit(1)
-
-import requests
 
 # Setup logging
 logging.basicConfig(
@@ -46,12 +43,12 @@ if not TELEGRAM_BOT_TOKEN:
     print("Error: TELEGRAM_BOT_TOKEN not set")
     sys.exit(1)
 
+from oura_api import OuraClient
+
 OURA_API_TOKEN = os.environ.get("OURA_API_TOKEN")
 if not OURA_API_TOKEN:
     print("Error: OURA_API_TOKEN not set. Get it from https://cloud.ouraring.com/personal-access-tokens")
     sys.exit(1)
-
-from oura_api import OuraClient
 
 oura = OuraClient(OURA_API_TOKEN)
 
@@ -126,7 +123,7 @@ async def readiness(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     score = data.get("score", "N/A")
 
-    msg = f"⚡ *Today's Readiness*\n\n"
+    msg = "⚡ *Today's Readiness*\n\n"
     msg += f"Score: *{score}*/100\n\n"
 
     # Contributors
@@ -179,7 +176,7 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     avg_hours = round(sum(hours) / len(hours), 1)
     avg_readiness = round(sum(readies) / len(readies), 1) if readies else "N/A"
 
-    msg = f"📊 *Weekly Report*\n\n"
+    msg = "📊 *Weekly Report*\n\n"
     msg += f"Avg Sleep Score: *{avg_score}*/100\n"
     msg += f"Avg Readiness: *{avg_readiness}*/100\n"
     msg += f"Avg Sleep: *{avg_hours}h*\n"

@@ -171,7 +171,7 @@ def format_telegram_message(week_data, period):
     # Last 2 days
     last_2_days = week_data.get('last_2_days', [])
     if last_2_days:
-        msg += f"\n📅 *Last 2 Days:*\n"
+        msg += "\n📅 *Last 2 Days:*\n"
         for day_data in last_2_days:
             day = day_data.get('day', '')
             sleep = day_data.get('sleep_score', 'N/A')
