@@ -1,0 +1,5 @@
+# Development dependencies for Oura Analytics skill
+pytest>=7.0
+pytest-cov
+ruff
+responses  # for mocking HTTP requests
