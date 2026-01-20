@@ -82,14 +82,48 @@ def analyze_week(sleep_data, readiness_data=None):
             if r and isinstance(r, dict) and r.get("score"):
                 readiness_scores.append(r["score"])
 
+    # Calculate trend (first half vs second half)
+    half = len(scores) // 2
+    if half >= 1:
+        first_half_avg = sum(scores[:half]) / half
+        second_half_avg = sum(scores[half:]) / (len(scores) - half)
+        sleep_trend = round(second_half_avg - first_half_avg, 1)
+    else:
+        sleep_trend = 0
+
+    if len(readiness_scores) >= 2:
+        half = len(readiness_scores) // 2
+        first_half_avg = sum(readiness_scores[:half]) / half
+        second_half_avg = sum(readiness_scores[half:]) / (len(readiness_scores) - half)
+        readiness_trend = round(second_half_avg - first_half_avg, 1)
+    else:
+        readiness_trend = 0
+
+    # Get last 2 days individual data
+    last_2_days = []
+    for i, d in enumerate(sleep_data[-2:]):
+        day = d.get("day")
+        score = scores[-(2-i)] if len(scores) >= 2-i else scores[0]
+        hours = seconds_to_hours(d.get("total_sleep_duration", 0))
+        r_score = readiness_by_day.get(day, {}).get("score") if day in readiness_by_day else None
+        last_2_days.append({
+            "day": day,
+            "sleep_score": score,
+            "readiness": r_score,
+            "hours": hours
+        })
+
     return {
         "avg_sleep_score": round(sum(scores) / len(scores), 1) if scores else None,
         "avg_readiness": round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else None,
         "avg_efficiency": avg_efficiency,
         "avg_duration": round(sum(durations) / len(durations), 1) if durations else None,
+        "sleep_trend": sleep_trend,
+        "readiness_trend": readiness_trend,
         "best_day": sleep_data[scores.index(max(scores))].get("day") if sleep_data and scores else None,
         "worst_day": sleep_data[scores.index(min(scores))].get("day") if sleep_data and scores else None,
-        "days_tracked": len(sleep_data)
+        "days_tracked": len(sleep_data),
+        "last_2_days": last_2_days
     }
 
 
@@ -101,18 +135,55 @@ def format_telegram_message(week_data, period):
         "efficiency": "📊",
         "duration": "⏰",
         "best": "🏆",
-        "worst": "⚠️"
+        "worst": "⚠️",
+        "trend_up": "↗️",
+        "trend_down": "↘️",
+        "trend_same": "➡️"
     }
-    
+
+    # Trend indicators
+    sleep_trend = week_data.get('sleep_trend', 0)
+    readiness_trend = week_data.get('readiness_trend', 0)
+
+    def trend_emoji(val):
+        if val > 1:
+            return emoji["trend_up"]
+        elif val < -1:
+            return emoji["trend_down"]
+        return emoji["trend_same"]
+
     msg = f"📈 *Oura Weekly Report* ({period})\n\n"
-    msg += f"{emoji['sleep']} Sleep Score: *{week_data['avg_sleep_score']}*/100\n"
-    msg += f"{emoji['readiness']} Readiness: *{week_data['avg_readiness']}*/100\n"
+
+    # Averages with trends
+    msg += f"{emoji['sleep']} Sleep Score: *{week_data['avg_sleep_score']}*/100 {trend_emoji(sleep_trend)}"
+    if sleep_trend != 0:
+        msg += f" ({'+' if sleep_trend > 0 else ''}{sleep_trend})"
+    msg += "\n"
+
+    msg += f"{emoji['readiness']} Readiness: *{week_data['avg_readiness']}*/100 {trend_emoji(readiness_trend)}"
+    if readiness_trend != 0:
+        msg += f" ({'+' if readiness_trend > 0 else ''}{readiness_trend})"
+    msg += "\n"
+
     msg += f"{emoji['efficiency']} Efficiency: *{week_data['avg_efficiency']}%*\n"
     msg += f"{emoji['duration']} Avg Sleep: *{week_data['avg_duration']}h*\n"
-    msg += f"\n{emoji['best']} Best Day: {week_data['best_day']}\n"
-    msg += f"{emoji['worst']} Worst Day: {week_data['worst_day']}\n"
+
+    # Last 2 days
+    last_2_days = week_data.get('last_2_days', [])
+    if last_2_days:
+        msg += f"\n📅 *Last 2 Days:*\n"
+        for day_data in last_2_days:
+            day = day_data.get('day', '')
+            sleep = day_data.get('sleep_score', 'N/A')
+            ready = day_data.get('readiness', 'N/A')
+            hours = day_data.get('hours', 'N/A')
+            ready_str = f"{ready}/100" if ready is not None else "N/A"
+            msg += f"  {day}: 😴{sleep} ⚡{ready_str} ⏰{hours}h\n"
+
+    msg += f"\n{emoji['best']} Best: {week_data['best_day']}\n"
+    msg += f"{emoji['worst']} Worst: {week_data['worst_day']}\n"
     msg += f"\n_Tracked: {week_data['days_tracked']} days_"
-    
+
     return msg
 
 
@@ -155,13 +226,24 @@ def main():
         
         # Print nicely
         print(f"\n📊 Oura Weekly Report ({period})")
-        print(f"   Sleep Score: {week_data['avg_sleep_score']}")
-        print(f"   Readiness: {week_data['avg_readiness']}")
+        sleep_trend = week_data.get('sleep_trend', 0)
+        readiness_trend = week_data.get('readiness_trend', 0)
+        trend_symbol = lambda v: "↗️" if v > 0 else ("↘️" if v < 0 else "➡️")
+        print(f"   Sleep Score: {week_data['avg_sleep_score']} {trend_symbol(sleep_trend)} ({'+' if sleep_trend > 0 else ''}{sleep_trend})")
+        print(f"   Readiness: {week_data['avg_readiness']} {trend_symbol(readiness_trend)} ({'+' if readiness_trend > 0 else ''}{readiness_trend})")
         print(f"   Efficiency: {week_data['avg_efficiency']}%")
         print(f"   Avg Duration: {week_data['avg_duration']}h")
-        print(f"   Best Day: {week_data['best_day']}")
-        print(f"   Worst Day: {week_data['worst_day']}")
-        print(f"   Days Tracked: {week_data['days_tracked']}")
+
+        # Last 2 days
+        last_2 = week_data.get('last_2_days', [])
+        if last_2:
+            print(f"\n   📅 Last 2 Days:")
+            for d in last_2:
+                ready = d.get('readiness')
+                print(f"      {d['day']}: 😴{d['sleep_score']} ⚡{ready}/100 ⏰{d['hours']}h")
+
+        print(f"\n   Best: {week_data['best_day']} | Worst: {week_data['worst_day']}")
+        print(f"   Tracked: {week_data['days_tracked']} days")
         
         # Send to Telegram
         if args.telegram:
