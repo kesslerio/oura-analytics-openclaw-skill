@@ -248,7 +248,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Run the bot"""
-    app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    print("🤖 Starting KesslerHealthBot...")
+    
+    app = (
+        Application.builder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .connect_timeout(10.0)  # 10 second connection timeout
+        .read_timeout(30.0)     # 30 second read timeout
+        .write_timeout(30.0)    # 30 second write timeout
+        .pool_timeout(30.0)     # 30 second pool timeout
+        .build()
+    )
     
     # Add handlers
     app.add_handler(CommandHandler("start", start))
@@ -258,11 +268,15 @@ def main():
     app.add_handler(CommandHandler("alerts", alerts))
     app.add_handler(CommandHandler("help", help_command))
     
-    print("🤖 KesslerHealthBot started!")
+    print("✅ Bot configured. Connecting to Telegram...")
     print("Send /start to your bot on Telegram")
     
-    # Start polling
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Start polling with timeouts
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        drop_pending_updates=True,
+        close_loop=False
+    )
 
 
 if __name__ == "__main__":

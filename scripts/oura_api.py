@@ -43,7 +43,7 @@ class OuraClient:
         if end_date:
             params["end_date"] = end_date
         
-        resp = requests.get(url, headers=self.headers, params=params)
+        resp = requests.get(url, headers=self.headers, params=params, timeout=10)
         resp.raise_for_status()
         return resp.json().get("data", [])
     
@@ -81,7 +81,8 @@ class OuraClient:
         resp_daily = requests.get(
             f"{self.BASE_URL}/daily_sleep",
             headers=self.headers,
-            params={"start_date": start_date, "end_date": end_date}
+            params={"start_date": start_date, "end_date": end_date},
+            timeout=10
         )
         resp_daily.raise_for_status()
         daily_data = {item["day"]: item for item in resp_daily.json().get("data", [])}
@@ -90,7 +91,8 @@ class OuraClient:
         resp_sleep = requests.get(
             f"{self.BASE_URL}/sleep",
             headers=self.headers,
-            params={"start_date": start_date, "end_date": end_date}
+            params={"start_date": start_date, "end_date": end_date},
+            timeout=10
         )
         resp_sleep.raise_for_status()
         sleep_data = resp_sleep.json().get("data", [])
