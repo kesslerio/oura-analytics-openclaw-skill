@@ -103,7 +103,7 @@ class TestOuraClient:
         """Test that HTTP errors are raised."""
         responses.get(
             "https://api.ouraring.com/v2/usercollection/sleep",
-            status_code=401,
+            status=401,
             json={"error": "Unauthorized"}
         )
 
