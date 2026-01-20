@@ -181,7 +181,7 @@ class OuraReporter:
 
 def main():
     parser = argparse.ArgumentParser(description="Oura Analytics CLI")
-    parser.add_argument("command", choices=["sleep", "readiness", "activity", "report", "summary"],
+    parser.add_argument("command", choices=["sleep", "daily_sleep", "readiness", "activity", "report", "summary", "comparison"],
                        help="Data type to fetch or report type")
     parser.add_argument("--days", type=int, default=7, help="Number of days")
     parser.add_argument("--type", default="weekly", help="Report type")
@@ -198,6 +198,10 @@ def main():
         if args.command == "sleep":
             data = client.get_sleep(start_date, end_date)
             print(json.dumps(data, indent=2))
+            
+        elif args.command == "daily_sleep":
+            data = client.get_daily_sleep(start_date, end_date)
+            print(json.dumps(data, indent=2))
         
         elif args.command == "readiness":
             data = client.get_readiness(start_date, end_date)
@@ -209,10 +213,45 @@ def main():
         
         elif args.command == "summary":
             sleep = client.get_sleep(start_date, end_date)
-            readiness = client.get_readiness(start_date, end_date)
-            analyzer = OuraAnalyzer(sleep, readiness)
+            # readiness = client.get_readiness(start_date, end_date) # Unused in analyzer currently if passing only sleep
+            analyzer = OuraAnalyzer(sleep)
             summary = analyzer.summary()
             print(json.dumps(summary, indent=2))
+
+        elif args.command == "comparison":
+            # Fetch 2x days
+            doubled_days = args.days * 2
+            start_date_extended = (datetime.now() - timedelta(days=doubled_days)).strftime("%Y-%m-%d")
+            
+            sleep = client.get_sleep(start_date_extended, end_date)
+            
+            # Sort by date
+            sleep = sorted(sleep, key=lambda x: x.get('day'))
+            
+            # Split into Current (last N days) and Previous (N days before that)
+            current_sleep = sleep[-args.days:] if len(sleep) > 0 else []
+            previous_sleep = sleep[:-args.days][-args.days:] if len(sleep) > args.days else []
+            
+            analyzer_curr = OuraAnalyzer(current_sleep)
+            analyzer_prev = OuraAnalyzer(previous_sleep)
+            
+            summary_curr = analyzer_curr.summary()
+            summary_prev = analyzer_prev.summary()
+            
+            diff = {}
+            for key in summary_curr:
+                curr_val = summary_curr.get(key)
+                prev_val = summary_prev.get(key)
+                if isinstance(curr_val, (int, float)) and isinstance(prev_val, (int, float)):
+                    diff[key] = round(curr_val - prev_val, 2)
+                else:
+                    diff[key] = None
+            
+            print(json.dumps({
+                "current": summary_curr,
+                "previous": summary_prev,
+                "diff": diff
+            }, indent=2))
         
         elif args.command == "report":
             reporter = OuraReporter(client)
