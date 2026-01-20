@@ -19,6 +19,10 @@ import sys
 import json
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
+
+# Add scripts directory to path for imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:
     from telegram import Update
@@ -47,55 +51,7 @@ if not OURA_API_TOKEN:
     print("Error: OURA_API_TOKEN not set. Get it from https://cloud.ouraring.com/personal-access-tokens")
     sys.exit(1)
 
-
-class OuraClient:
-    BASE_URL = "https://api.ouraring.com/v2/usercollection"
-    
-    def __init__(self, token):
-        self.token = token
-        self.headers = {"Authorization": f"Bearer {token}"}
-    
-    def get_recent_sleep(self, days=2):
-        # Oura data is processed with delay - get last few days
-        end = datetime.now().strftime("%Y-%m-%d")
-        start = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
-
-        # Get daily sleep scores
-        resp_daily = requests.get(
-            f"{self.BASE_URL}/daily_sleep",
-            headers=self.headers,
-            params={"start_date": start, "end_date": end}
-        )
-        daily_data = {item["day"]: item for item in resp_daily.json().get("data", [])}
-
-        # Get detailed sleep data
-        resp_sleep = requests.get(
-            f"{self.BASE_URL}/sleep",
-            headers=self.headers,
-            params={"start_date": start, "end_date": end}
-        )
-        sleep_data = resp_sleep.json().get("data", [])
-
-        # Merge: add scores to sleep data
-        for item in sleep_data:
-            day = item.get("day")
-            if day in daily_data:
-                item["score"] = daily_data[day].get("score")
-
-        # Return last N entries
-        return sleep_data[-days:] if len(sleep_data) >= days else sleep_data
-    
-    def get_weekly_summary(self):
-        end = datetime.now().strftime("%Y-%m-%d")
-        start = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-        
-        resp = requests.get(
-            f"{self.BASE_URL}/sleep",
-            headers=self.headers,
-            params={"start_date": start, "end_date": end}
-        )
-        return resp.json().get("data", [])
-
+from oura_api import OuraClient
 
 oura = OuraClient(OURA_API_TOKEN)
 

@@ -67,6 +67,49 @@ class OuraClient:
         """Fetch HRV data"""
         return self._request("hrv", start_date, end_date)
 
+    def get_recent_sleep(self, days=2):
+        """Fetch and merge recent sleep data (daily + detailed).
+
+        Oura data is processed with delay - get last few days and merge
+        daily_sleep scores with detailed sleep data.
+        """
+        # Oura data is processed with delay - get last few days
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
+
+        # Get daily sleep scores
+        resp_daily = requests.get(
+            f"{self.BASE_URL}/daily_sleep",
+            headers=self.headers,
+            params={"start_date": start_date, "end_date": end_date}
+        )
+        resp_daily.raise_for_status()
+        daily_data = {item["day"]: item for item in resp_daily.json().get("data", [])}
+
+        # Get detailed sleep data
+        resp_sleep = requests.get(
+            f"{self.BASE_URL}/sleep",
+            headers=self.headers,
+            params={"start_date": start_date, "end_date": end_date}
+        )
+        resp_sleep.raise_for_status()
+        sleep_data = resp_sleep.json().get("data", [])
+
+        # Merge: add scores to sleep data
+        for item in sleep_data:
+            day = item.get("day")
+            if day in daily_data:
+                item["score"] = daily_data[day].get("score")
+
+        # Return last N entries
+        return sleep_data[-days:] if len(sleep_data) >= days else sleep_data
+
+    def get_weekly_summary(self):
+        """Fetch weekly sleep summary"""
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+        return self.get_sleep(start_date, end_date)
+
 
 class OuraAnalyzer:
     """Analyze Oura data"""

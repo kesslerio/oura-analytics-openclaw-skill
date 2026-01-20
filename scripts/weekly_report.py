@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-import argparse
 """
 Oura Weekly Report Generator
 
 Generates automated weekly health reports and can send to Telegram.
 """
 
+import argparse
 import os
 import sys
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
+
+# Add scripts directory to path for imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:
     import requests
@@ -18,31 +21,7 @@ except ImportError:
     print("Install requests: pip install requests")
     sys.exit(1)
 
-
-class OuraClient:
-    """Oura Cloud API client"""
-    
-    BASE_URL = "https://api.ouraring.com/v2/usercollection"
-    
-    def __init__(self, token=None):
-        self.token = token or os.environ.get("OURA_API_TOKEN")
-        if not self.token:
-            raise ValueError("OURA_API_TOKEN not set")
-        self.headers = {"Authorization": f"Bearer {self.token}"}
-    
-    def _request(self, endpoint, start_date=None, end_date=None):
-        url = f"{self.BASE_URL}/{endpoint}"
-        params = {}
-        if start_date:
-            params["start_date"] = start_date
-        if end_date:
-            params["end_date"] = end_date
-        resp = requests.get(url, headers=self.headers, params=params)
-        resp.raise_for_status()
-        return resp.json().get("data", [])
-    
-    def get_sleep(self, start_date, end_date):
-        return self._request("sleep", start_date, end_date)
+from oura_api import OuraClient
 
 
 def seconds_to_hours(seconds):
