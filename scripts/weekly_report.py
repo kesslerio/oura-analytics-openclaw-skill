@@ -46,8 +46,22 @@ def analyze_week(sleep_data, readiness_data=None):
     if not sleep_data:
         return None
 
-    scores = [calculate_sleep_score(d) for d in sleep_data]
+    # Calculate scores - handle case where efficiency may not be in sleep endpoint
+    scores = []
+    for d in sleep_data:
+        score = calculate_sleep_score(d)
+        if score is None or score == 0:
+            # Calculate from duration only when efficiency missing
+            duration_sec = d.get("total_sleep_duration", 0)
+            duration_hours = duration_sec / 3600 if duration_sec else 0
+            dur_score = min(duration_hours / 8 * 100, 100)
+            score = round(dur_score, 1)
+        scores.append(score)
+
+    # Get efficiency from sleep data (may be 0 if not in /sleep endpoint)
     efficiencies = [d.get("efficiency", 0) for d in sleep_data]
+    avg_efficiency = round(sum(efficiencies) / len(efficiencies), 1) if efficiencies and any(efficiencies) else None
+
     durations = [seconds_to_hours(d.get("total_sleep_duration", 0)) for d in sleep_data]
 
     # Build readiness lookup by day from dedicated dataset
@@ -71,10 +85,10 @@ def analyze_week(sleep_data, readiness_data=None):
     return {
         "avg_sleep_score": round(sum(scores) / len(scores), 1) if scores else None,
         "avg_readiness": round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else None,
-        "avg_efficiency": round(sum(efficiencies) / len(efficiencies), 1) if efficiencies else None,
+        "avg_efficiency": avg_efficiency,
         "avg_duration": round(sum(durations) / len(durations), 1) if durations else None,
-        "best_day": max(sleep_data, key=lambda x: calculate_sleep_score(x)).get("day") if sleep_data else None,
-        "worst_day": min(sleep_data, key=lambda x: calculate_sleep_score(x)).get("day") if sleep_data else None,
+        "best_day": sleep_data[scores.index(max(scores))].get("day") if sleep_data and scores else None,
+        "worst_day": sleep_data[scores.index(min(scores))].get("day") if sleep_data and scores else None,
         "days_tracked": len(sleep_data)
     }
 
