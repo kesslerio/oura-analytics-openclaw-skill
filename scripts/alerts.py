@@ -149,8 +149,9 @@ def main():
             print(f"   Sleep > {args.sleep_hours}h")
         
         # Save to file
-        alert_file = f"/home/art/clawd-research/reports/oura_alerts_{end_date}.json"
-        os.makedirs(os.path.dirname(alert_file), exist_ok=True)
+        output_dir = os.environ.get("OURA_OUTPUT_DIR", str(Path.home() / ".oura-analytics" / "reports"))
+        alert_file = f"{output_dir}/oura_alerts_{end_date}.json"
+        os.makedirs(output_dir, exist_ok=True)
         with open(alert_file, "w") as f:
             json.dump({"period": f"{start_date} to {end_date}", "alerts": alerts}, f, indent=2)
         print(f"\n💾 Saved to {alert_file}")
