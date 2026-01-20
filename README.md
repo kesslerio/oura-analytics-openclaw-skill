@@ -76,11 +76,11 @@ python scripts/oura_api.py readiness --days 7
 ### Generate Reports
 
 ```bash
-# Weekly summary
-python scripts/weekly_report.py --type weekly --days 7
+# Weekly summary (last 7 days)
+python scripts/weekly_report.py --days 7
 
-# Monthly trends
-python scripts/weekly_report.py --type monthly --days 30
+# Monthly trends (last 30 days)
+python scripts/weekly_report.py --days 30
 ```
 
 ### Trigger Alerts
