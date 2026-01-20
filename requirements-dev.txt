@@ -1,6 +1,4 @@
 # Development dependencies for Oura Analytics skill
 pytest>=7.0
 pytest-cov
-pytest-requests-mock  # provides requests_mock fixture for HTTP mocking
-ruff
-responses  # for mocking HTTP requests
+responses  # for mocking HTTP requests in tests
