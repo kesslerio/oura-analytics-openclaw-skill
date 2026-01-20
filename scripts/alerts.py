@@ -10,6 +10,10 @@ import sys
 import json
 import argparse
 from datetime import datetime, timedelta
+from pathlib import Path
+
+# Add scripts directory to path for imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 try:
     import requests
@@ -17,25 +21,7 @@ except ImportError:
     print("Install requests: pip install requests")
     sys.exit(1)
 
-
-class OuraClient:
-    BASE_URL = "https://api.ouraring.com/v2/usercollection"
-    
-    def __init__(self, token=None):
-        self.token = token or os.environ.get("OURA_API_TOKEN")
-        if not self.token:
-            raise ValueError("OURA_API_TOKEN not set")
-        self.headers = {"Authorization": f"Bearer {self.token}"}
-    
-    def get_sleep(self, start_date, end_date):
-        """Fetch sleep data"""
-        url = f"{self.BASE_URL}/sleep"
-        resp = requests.get(url, headers=self.headers, params={
-            "start_date": start_date,
-            "end_date": end_date
-        })
-        resp.raise_for_status()
-        return resp.json().get("data", [])
+from oura_api import OuraClient
 
 
 def seconds_to_hours(seconds):
