@@ -61,10 +61,10 @@ low_days = alerts.find_low_days(readiness_data)
 
 ## Scripts
 
-- `scripts/oura_api.py` - Oura Cloud API wrapper
-- `scripts/analyzer.py` - Trend analysis and correlations
-- `scripts/alerts.py` - Threshold-based notifications
-- `scripts/report.py` - Report generation
+- `scripts/oura_api.py` - Oura Cloud API wrapper with OuraAnalyzer and OuraReporter classes
+- `scripts/alerts.py` - Threshold-based notifications (CLI: `python scripts/alerts.py --days 7 --readiness 60`)
+- `scripts/weekly_report.py` - Weekly report generator
+- `scripts/telegram_bot.py` - Optional Telegram bot integration
 
 ## References
 

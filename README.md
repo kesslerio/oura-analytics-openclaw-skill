@@ -65,9 +65,6 @@ pip install requests python-telegram-bot
 ```bash
 # Last 7 days
 python scripts/oura_api.py sleep --days 7
-
-# Specific date range
-python scripts/oura_api.py sleep --start 2026-01-01 --end 2026-01-16
 ```
 
 ### Get Readiness Summary
@@ -80,17 +77,17 @@ python scripts/oura_api.py readiness --days 7
 
 ```bash
 # Weekly summary
-python scripts/report.py --type weekly
+python scripts/weekly_report.py --type weekly --days 7
 
 # Monthly trends
-python scripts/report.py --type monthly
+python scripts/weekly_report.py --type monthly --days 30
 ```
 
 ### Trigger Alerts
 
 ```bash
 # Check for low readiness and send Telegram notification
-python scripts/alerts.py --threshold readiness=60 --telegram
+python scripts/alerts.py --days 7 --readiness 60 --efficiency 80 --telegram
 ```
 
 ## Core Workflows
@@ -98,33 +95,37 @@ python scripts/alerts.py --threshold readiness=60 --telegram
 ### 1. Morning Health Check
 
 ```python
-from oura_api import OuraClient
+from oura_api import OuraClient, OuraAnalyzer
 
 client = OuraClient(token=os.getenv("OURA_API_TOKEN"))
-today = client.get_sleep(date="2026-01-18")[0]
+sleep_data = client.get_sleep(start_date="2026-01-18", end_date="2026-01-18")
+today = sleep_data[0] if sleep_data else {}
 
-print(f"Sleep Score: {today['score']}/100")
-print(f"Total Sleep: {today['total_sleep_duration']/3600:.1f}h")
-print(f"REM: {today['rem_sleep_duration']/3600:.1f}h")
-print(f"Deep: {today['deep_sleep_duration']/3600:.1f}h")
+if today:
+    print(f"Sleep Score: {today.get('score', 'N/A')}/100")
+    print(f"Total Sleep: {today.get('total_sleep_duration', 0)/3600:.1f}h")
+    print(f"REM: {today.get('rem_sleep_duration', 0)/3600:.1f}h")
+    print(f"Deep: {today.get('deep_sleep_duration', 0)/3600:.1f}h")
 ```
 
 ### 2. Recovery Tracking
 
 ```python
-readiness = client.get_readiness(days=7)
-avg_readiness = sum(d['score'] for d in readiness) / len(readiness)
+readiness = client.get_readiness(start_date="2026-01-11", end_date="2026-01-18")
+avg_readiness = sum(d.get('score', 0) for d in readiness) / len(readiness) if readiness else 0
 print(f"7-day avg readiness: {avg_readiness:.0f}")
 ```
 
-### 3. Correlation Analysis
+### 3. Trend Analysis
 
 ```python
-from analyzer import OuraAnalyzer
+from oura_api import OuraAnalyzer
 
-analyzer = OuraAnalyzer(sleep_data, calendar_events)
-correlation = analyzer.correlate("sleep_score", "work_hours")
-print(f"Sleep vs Work Hours: r={correlation:.2f}")
+analyzer = OuraAnalyzer(sleep_data, readiness_data)
+avg_sleep = analyzer.average_metric(sleep_data, "score")
+avg_readiness = analyzer.average_metric(readiness_data, "score")
+print(f"Avg Sleep Score: {avg_sleep}")
+print(f"Avg Readiness Score: {avg_readiness}")
 ```
 
 ## API Client Reference
@@ -134,18 +135,52 @@ print(f"Sleep vs Work Hours: r={correlation:.2f}")
 ```python
 client = OuraClient(token="your_token")
 
-# Sleep data
+# Sleep data (date range required)
 sleep = client.get_sleep(start_date="2026-01-01", end_date="2026-01-16")
-sleep_today = client.get_sleep(date="2026-01-18")
 
 # Readiness data
-readiness = client.get_readiness(days=7)
+readiness = client.get_readiness(start_date="2026-01-01", end_date="2026-01-16")
 
 # Activity data
-activity = client.get_activity(days=30)
+activity = client.get_activity(start_date="2026-01-01", end_date="2026-01-16")
 
 # HRV trends
-hrv = client.get_hrv(days=14)
+hrv = client.get_hrv(start_date="2026-01-01", end_date="2026-01-16")
+```
+
+### OuraAnalyzer
+
+```python
+from oura_api import OuraClient, OuraAnalyzer
+
+client = OuraClient(token="your_token")
+sleep = client.get_sleep(start_date="2026-01-01", end_date="2026-01-16")
+readiness = client.get_readiness(start_date="2026-01-01", end_date="2026-01-16")
+
+analyzer = OuraAnalyzer(sleep_data=sleep, readiness_data=readiness)
+
+# Average metrics
+avg_sleep = analyzer.average_metric(sleep, "score")
+avg_readiness = analyzer.average_metric(readiness, "score")
+
+# Trend analysis
+trend = analyzer.trend(sleep, "score", days=7)
+
+# Summary
+summary = analyzer.summary()
+```
+
+### OuraReporter
+
+```python
+from oura_api import OuraClient, OuraReporter
+
+client = OuraClient(token="your_token")
+reporter = OuraReporter(client)
+
+# Generate weekly report
+report = reporter.generate_report(report_type="weekly", days=7)
+print(json.dumps(report, indent=2))
 ```
 
 ## Telegram Bot Integration
@@ -155,15 +190,10 @@ Optional: Run as standalone Telegram bot for daily notifications.
 ```bash
 # Set bot token
 echo 'TELEGRAM_BOT_TOKEN="your_bot_token"' >> ~/.config/systemd/user/secrets.conf
+echo 'TELEGRAM_CHAT_ID="your_chat_id"' >> ~/.config/systemd/user/secrets.conf
 
 # Run bot
 python scripts/telegram_bot.py
-```
-
-**Systemd service** (optional):
-```bash
-cp scripts/oura-telegram-bot.service ~/.config/systemd/user/
-systemctl --user enable --now oura-telegram-bot.service
 ```
 
 ## Metrics Reference
@@ -182,10 +212,9 @@ See `references/metrics.md` for full definitions.
 
 ## Architecture
 
-- **`scripts/oura_api.py`** - Oura Cloud API v2 client
-- **`scripts/analyzer.py`** - Trend analysis and correlations
-- **`scripts/alerts.py`** - Threshold-based alerting
-- **`scripts/report.py`** - Report generation templates
+- **`scripts/oura_api.py`** - Oura Cloud API v2 client with OuraAnalyzer and OuraReporter classes
+- **`scripts/alerts.py`** - Threshold-based alerting CLI
+- **`scripts/weekly_report.py`** - Weekly report generator
 - **`scripts/telegram_bot.py`** - Optional Telegram bot integration
 - **`references/`** - API docs, metric definitions
 
@@ -205,7 +234,10 @@ python scripts/oura_api.py sleep --days 7 --token "your_token"
 
 ```bash
 # Check date range (Oura data has ~24h delay)
-python scripts/oura_api.py sleep --start 2026-01-15 --end 2026-01-17
+python scripts/oura_api.py sleep --days 10
+
+# Or fetch and inspect manually
+python scripts/oura_api.py sleep --days 7 | python -m json.tool | head -50
 ```
 
 ## Credits
