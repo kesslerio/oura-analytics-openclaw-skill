@@ -42,7 +42,10 @@ if not TELEGRAM_BOT_TOKEN:
     print("Error: TELEGRAM_BOT_TOKEN not set")
     sys.exit(1)
 
-OURA_API_TOKEN = os.environ.get("OURA_API_TOKEN", "5NTLJKPQTCBXBIOO2AKTNY5E2G6AZKIG")
+OURA_API_TOKEN = os.environ.get("OURA_API_TOKEN")
+if not OURA_API_TOKEN:
+    print("Error: OURA_API_TOKEN not set. Get it from https://cloud.ouraring.com/personal-access-tokens")
+    sys.exit(1)
 
 
 class OuraClient:
