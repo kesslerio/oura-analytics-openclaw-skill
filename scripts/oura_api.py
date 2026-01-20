@@ -171,13 +171,8 @@ class OuraAnalyzer:
         sleep_scores = [self.calculate_sleep_score(d) for d in self.sleep]
         avg_sleep_score = round(sum(sleep_scores) / len(sleep_scores), 1) if sleep_scores else None
         
-        # Readiness from nested object in sleep data
-        readiness_scores = []
-        for day in self.sleep:
-            readiness = day.get("readiness", {})
-            if readiness and readiness.get("score"):
-                readiness_scores.append(readiness["score"])
-        avg_readiness = round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else None
+        # Readiness from dedicated dataset (not nested in sleep)
+        avg_readiness = self.average_metric(self.readiness, "score")
         
         return {
             "avg_sleep_score": avg_sleep_score,

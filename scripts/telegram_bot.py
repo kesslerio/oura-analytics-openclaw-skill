@@ -102,90 +102,120 @@ async def sleep(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def readiness(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /readiness command"""
-    data_list = oura.get_recent_sleep(days=2)
+    """Handle /readiness command - fetch from daily_readiness endpoint"""
+    # Get most recent readiness data from proper endpoint
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
 
-    if not data_list:
-        await update.message.reply_text("❌ No recent data found. Make sure your Oura ring is synced.")
+    readiness_data = oura.get_readiness(start_date, end_date)
+
+    if not readiness_data:
+        await update.message.reply_text("❌ No recent readiness data found. Make sure your Oura ring is synced.")
         return
 
-    data = data_list[-1]  # Get most recent for readiness
-    
-    readiness = data.get("readiness", {})
-    score = readiness.get("score", "N/A")
-    
+    data = readiness_data[-1]  # Get most recent
+
+    score = data.get("score", "N/A")
+
     msg = f"⚡ *Today's Readiness*\n\n"
     msg += f"Score: *{score}*/100\n\n"
-    
+
     # Contributors
-    contrib = readiness.get("contributors", {})
+    contrib = data.get("contributors", {})
     if contrib:
         msg += "_Contributors:_\n"
         for key, value in contrib.items():
             msg += f"• {key.replace('_', ' ').title()}: {value}\n"
-    
+
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /report command"""
-    data = oura.get_weekly_summary()
-    
-    if not data:
+    # Fetch sleep data
+    sleep_data = oura.get_weekly_summary()
+
+    if not sleep_data:
         await update.message.reply_text("❌ No data for this week.")
         return
-    
+
+    # Fetch readiness data from proper endpoint
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    readiness_data = oura.get_readiness(start_date, end_date)
+
+    # Build readiness lookup by day
+    readiness_by_day = {r.get("day"): r for r in readiness_data}
+
     # Calculate averages
     scores = []
     efficiencies = []
     hours = []
     readies = []
-    
-    for day in data:
+
+    for day in sleep_data:
         scores.append(day.get("score", 0))
         efficiencies.append(day.get("efficiency", 0))
         hours.append(day.get("total_sleep_duration", 0) / 3600)
-        r = day.get("readiness", {}).get("score")
-        if r:
-            readies.append(r)
-    
+
+        # Get readiness from proper endpoint lookup
+        day_readiness = readiness_by_day.get(day.get("day"))
+        if day_readiness:
+            r = day_readiness.get("score")
+            if r:
+                readies.append(r)
+
     avg_score = round(sum(scores) / len(scores), 1)
     avg_eff = round(sum(efficiencies) / len(efficiencies), 1)
     avg_hours = round(sum(hours) / len(hours), 1)
     avg_readiness = round(sum(readies) / len(readies), 1) if readies else "N/A"
-    
+
     msg = f"📊 *Weekly Report*\n\n"
     msg += f"Avg Sleep Score: *{avg_score}*/100\n"
     msg += f"Avg Readiness: *{avg_readiness}*/100\n"
     msg += f"Avg Sleep: *{avg_hours}h*\n"
     msg += f"Avg Efficiency: *{avg_eff}%*\n"
-    msg += f"\n_Tracked: {len(data)} days_"
-    
+    msg += f"\n_Tracked: {len(sleep_data)} days_"
+
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
 async def alerts(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /alerts command"""
-    data = oura.get_weekly_summary()
-    
-    if not data:
+    """Handle /alerts command - use proper readiness endpoint"""
+    # Fetch sleep data
+    sleep_data = oura.get_weekly_summary()
+
+    if not sleep_data:
         await update.message.reply_text("❌ No data available.")
         return
-    
+
+    # Fetch readiness data from proper endpoint
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+    readiness_data = oura.get_readiness(start_date, end_date)
+
+    # Build readiness lookup by day
+    readiness_by_day = {r.get("day"): r for r in readiness_data}
+
     alert_days = []
-    for day in data:
-        readiness = day.get("readiness", {}).get("score", 100)
+    for day in sleep_data:
+        # Get readiness from proper endpoint lookup (not nested in sleep)
+        day_readiness = readiness_by_day.get(day.get("day"))
+        readiness = day_readiness.get("score") if day_readiness else None
+
         efficiency = day.get("efficiency", 100)
         hours = day.get("total_sleep_duration", 0) / 3600
-        
+
         alerts = []
-        if readiness < 70:
+        if readiness is not None and readiness < 70:
             alerts.append(f"Readiness {readiness}")
+        elif readiness is None:
+            alerts.append("Readiness N/A")
         if efficiency < 80:
             alerts.append(f"Efficiency {efficiency}%")
         if hours < 6:
             alerts.append(f"Sleep {hours:.1f}h")
-        
+
         if alerts:
             alert_days.append({"day": day.get("day"), "alerts": alerts})
     
