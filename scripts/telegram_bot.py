@@ -20,15 +20,14 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add scripts directory to path for imports
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
 try:
     from telegram import Update
     from telegram.ext import Application, CommandHandler, ContextTypes
 except ImportError:
     print("Install python-telegram-bot: pip install python-telegram-bot")
     sys.exit(1)
+
+from oura_api import OuraClient
 
 # Setup logging
 logging.basicConfig(
