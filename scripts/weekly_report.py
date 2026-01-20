@@ -36,21 +36,38 @@ def calculate_sleep_score(day):
     return round((eff_score * 0.6) + (dur_score * 0.4), 1)
 
 
-def analyze_week(sleep_data):
-    """Analyze weekly data"""
+def analyze_week(sleep_data, readiness_data=None):
+    """Analyze weekly data
+
+    Args:
+        sleep_data: List of sleep records from get_sleep()
+        readiness_data: List of readiness records from get_readiness() (optional for backwards compatibility)
+    """
     if not sleep_data:
         return None
-    
+
     scores = [calculate_sleep_score(d) for d in sleep_data]
     efficiencies = [d.get("efficiency", 0) for d in sleep_data]
     durations = [seconds_to_hours(d.get("total_sleep_duration", 0)) for d in sleep_data]
-    
+
+    # Build readiness lookup by day from dedicated dataset
+    readiness_by_day = {}
+    if readiness_data:
+        readiness_by_day = {r.get("day"): r for r in readiness_data}
+
     readiness_scores = []
     for d in sleep_data:
-        r = d.get("readiness", {})
-        if r and r.get("score"):
-            readiness_scores.append(r["score"])
-    
+        day = d.get("day")
+        if day in readiness_by_day:
+            r = readiness_by_day[day].get("score")
+            if r:
+                readiness_scores.append(r)
+        else:
+            # Fallback: try nested readiness (old broken format, for backwards compat)
+            r = d.get("readiness", {})
+            if r and isinstance(r, dict) and r.get("score"):
+                readiness_scores.append(r["score"])
+
     return {
         "avg_sleep_score": round(sum(scores) / len(scores), 1) if scores else None,
         "avg_readiness": round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else None,
@@ -115,7 +132,8 @@ def main():
     try:
         client = OuraClient(args.token)
         sleep = client.get_sleep(start_date, end_date)
-        week_data = analyze_week(sleep)
+        readiness = client.get_readiness(start_date, end_date)
+        week_data = analyze_week(sleep, readiness)
         
         if not week_data:
             print("No data available")

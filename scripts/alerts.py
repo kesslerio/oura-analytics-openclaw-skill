@@ -23,7 +23,7 @@ except ImportError:
     sys.exit(1)
 
 from oura_api import OuraClient
-from config import AlertConfig, AlertState, ConfigLoader, check_thresholds_with_quality
+from config import AlertState, ConfigLoader, check_thresholds_with_quality
 
 
 def seconds_to_hours(seconds):

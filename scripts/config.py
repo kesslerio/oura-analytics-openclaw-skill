@@ -5,7 +5,6 @@ Alert Configuration and Quality Controls
 Provides debounce, hysteresis, and configurable thresholds for alerts.
 """
 
-import os
 import yaml
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
