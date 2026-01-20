@@ -86,7 +86,16 @@ async def sleep(update: Update, context: ContextTypes.DEFAULT_TYPE):
         hours = round(day_data.get("total_sleep_duration", 0) / 3600, 1)
         efficiency = day_data.get("efficiency", "N/A")
         hrv = day_data.get("average_hrv", "N/A")
-        score = day_data.get("score", "N/A")
+
+        # Calculate score if not present (daily_sleep may have delay)
+        score = day_data.get("score")
+        if score is None:
+            # Calculate from efficiency and duration
+            eff = day_data.get("efficiency", 0)
+            dur_hours = day_data.get("total_sleep_duration", 0) / 3600
+            eff_score = min(eff, 100)
+            dur_score = min(dur_hours / 8 * 100, 100)
+            score = round((eff_score * 0.6) + (dur_score * 0.4), 1)
 
         label = "📅 Latest" if i == 0 else "📅 Previous"
         msg += f"{label} *({day})*\n"
