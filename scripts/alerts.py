@@ -28,31 +28,46 @@ def seconds_to_hours(seconds):
     return round(seconds / 3600, 1) if seconds else None
 
 
-def check_thresholds(sleep_data, thresholds):
-    """Check all days against thresholds"""
+def check_thresholds(sleep_data, readiness_data, thresholds):
+    """Check all days against thresholds.
+
+    Args:
+        sleep_data: List of sleep records from get_sleep()
+        readiness_data: List of readiness records from get_readiness()
+        thresholds: Dict with readiness, efficiency, sleep_hours thresholds
+    """
+    # Build readiness lookup by day
+    readiness_by_day = {r.get("day"): r for r in readiness_data}
+
     alerts = []
-    
+
     for day in sleep_data:
         date = day.get("day")
-        readiness = day.get("readiness", {}).get("score", 100)
+
+        # Get readiness from proper endpoint (not nested in sleep)
+        readiness_record = readiness_by_day.get(date)
+        readiness_score = readiness_record.get("score") if readiness_record else None
+
         efficiency = day.get("efficiency", 100)
         duration_sec = day.get("total_sleep_duration", 0)
         duration_hours = seconds_to_hours(duration_sec)
-        
+
         day_alerts = []
-        
-        if readiness < thresholds.get("readiness", 60):
-            day_alerts.append(f"Readiness {readiness}")
-        
+
+        # Only alert if readiness data is available and below threshold
+        if readiness_score is not None and readiness_score < thresholds.get("readiness", 60):
+            day_alerts.append(f"Readiness {readiness_score}")
+        # Note: Missing readiness data does not trigger alert (data may be pending)
+
         if efficiency < thresholds.get("efficiency", 80):
             day_alerts.append(f"Efficiency {efficiency}%")
-        
+
         if duration_hours and duration_hours < thresholds.get("sleep_hours", 7):
             day_alerts.append(f"Sleep {duration_hours}h")
-        
+
         if day_alerts:
             alerts.append({"date": date, "alerts": day_alerts})
-    
+
     return alerts
 
 
@@ -105,14 +120,15 @@ def main():
     try:
         client = OuraClient(args.token)
         sleep = client.get_sleep(start_date, end_date)
-        
+        readiness = client.get_readiness(start_date, end_date)
+
         thresholds = {
             "readiness": args.readiness,
             "efficiency": args.efficiency,
             "sleep_hours": args.sleep_hours
         }
-        
-        alerts = check_thresholds(sleep, thresholds)
+
+        alerts = check_thresholds(sleep, readiness, thresholds)
         
         if alerts:
             print(f"\n⚠️  {len(alerts)} Alert Days Found:\n")
@@ -132,8 +148,9 @@ def main():
             print(f"   Sleep > {args.sleep_hours}h")
         
         # Save to file
-        alert_file = f"/home/art/clawd-research/reports/oura_alerts_{end_date}.json"
-        os.makedirs(os.path.dirname(alert_file), exist_ok=True)
+        output_dir = os.environ.get("OURA_OUTPUT_DIR", str(Path.home() / ".oura-analytics" / "reports"))
+        alert_file = f"{output_dir}/oura_alerts_{end_date}.json"
+        os.makedirs(output_dir, exist_ok=True)
         with open(alert_file, "w") as f:
             json.dump({"period": f"{start_date} to {end_date}", "alerts": alerts}, f, indent=2)
         print(f"\n💾 Saved to {alert_file}")
