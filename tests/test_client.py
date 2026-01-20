@@ -3,6 +3,7 @@
 
 import pytest
 from pathlib import Path
+import responses  # Use responses library for HTTP mocking
 
 # Add scripts directory to path
 import sys
@@ -39,9 +40,10 @@ class TestOuraClient:
             if original:
                 os.environ["OURA_API_TOKEN"] = original
 
-    def test_request_url_construction(self, requests_mock):
+    @responses.activate
+    def test_request_url_construction(self):
         """Test that _request constructs URL correctly."""
-        requests_mock.get(
+        responses.get(
             "https://api.ouraring.com/v2/usercollection/sleep",
             json={"data": [{"day": "2026-01-15", "score": 80}]}
         )
@@ -51,12 +53,13 @@ class TestOuraClient:
 
         assert len(result) == 1
         assert result[0]["day"] == "2026-01-15"
-        assert requests_mock.last_request.qs["start_date"] == ["2026-01-01"]
-        assert requests_mock.last_request.qs["end_date"] == ["2026-01-15"]
+        assert "start_date=2026-01-01" in responses.calls[0].request.url
+        assert "end_date=2026-01-15" in responses.calls[0].request.url
 
-    def test_get_sleep_no_dates(self, requests_mock):
+    @responses.activate
+    def test_get_sleep_no_dates(self):
         """Test get_sleep returns all data when no dates specified."""
-        requests_mock.get(
+        responses.get(
             "https://api.ouraring.com/v2/usercollection/sleep",
             json={"data": [{"day": "2026-01-10"}, {"day": "2026-01-11"}]}
         )
@@ -65,12 +68,12 @@ class TestOuraClient:
         result = client.get_sleep()
 
         assert len(result) == 2
-        assert "start_date" not in requests_mock.last_request.qs
-        assert "end_date" not in requests_mock.last_request.qs
+        assert "start_date" not in responses.calls[0].request.url
 
-    def test_get_readiness(self, requests_mock):
+    @responses.activate
+    def test_get_readiness(self):
         """Test get_readiness method."""
-        requests_mock.get(
+        responses.get(
             "https://api.ouraring.com/v2/usercollection/daily_readiness",
             json={"data": [{"day": "2026-01-15", "score": 75}]}
         )
@@ -81,9 +84,10 @@ class TestOuraClient:
         assert len(result) == 1
         assert result[0]["score"] == 75
 
-    def test_get_activity(self, requests_mock):
+    @responses.activate
+    def test_get_activity(self):
         """Test get_activity method."""
-        requests_mock.get(
+        responses.get(
             "https://api.ouraring.com/v2/usercollection/daily_activity",
             json={"data": [{"day": "2026-01-15", "score": 65}]}
         )
@@ -94,9 +98,10 @@ class TestOuraClient:
         assert len(result) == 1
         assert result[0]["score"] == 65
 
-    def test_error_handling(self, requests_mock):
+    @responses.activate
+    def test_error_handling(self):
         """Test that HTTP errors are raised."""
-        requests_mock.get(
+        responses.get(
             "https://api.ouraring.com/v2/usercollection/sleep",
             status_code=401,
             json={"error": "Unauthorized"}
