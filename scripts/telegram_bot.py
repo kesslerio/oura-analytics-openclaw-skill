@@ -209,8 +209,7 @@ async def alerts(update: Update, context: ContextTypes.DEFAULT_TYPE):
         alerts = []
         if readiness is not None and readiness < 70:
             alerts.append(f"Readiness {readiness}")
-        elif readiness is None:
-            alerts.append("Readiness N/A")
+        # Note: Missing readiness data does not trigger alert (data may be pending)
         if efficiency < 80:
             alerts.append(f"Efficiency {efficiency}%")
         if hours < 6:

@@ -57,8 +57,7 @@ def check_thresholds(sleep_data, readiness_data, thresholds):
         # Only alert if readiness data is available and below threshold
         if readiness_score is not None and readiness_score < thresholds.get("readiness", 60):
             day_alerts.append(f"Readiness {readiness_score}")
-        elif readiness_score is None:
-            day_alerts.append("Readiness N/A (data pending)")
+        # Note: Missing readiness data does not trigger alert (data may be pending)
 
         if efficiency < thresholds.get("efficiency", 80):
             day_alerts.append(f"Efficiency {efficiency}%")
