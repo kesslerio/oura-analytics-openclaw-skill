@@ -12,6 +12,7 @@ import os
 import sys
 import json
 import argparse
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timedelta
@@ -42,8 +43,8 @@ class OuraClient:
         if use_cache and CACHE_AVAILABLE:
             self.cache = OuraCache()
 
-    def _request(self, endpoint, start_date=None, end_date=None):
-        """Make API request using urllib"""
+    def _request(self, endpoint, start_date=None, end_date=None, max_retries=3):
+        """Make API request using urllib with retry logic and rate limit handling"""
         url = f"{self.BASE_URL}/{endpoint}"
         params = []
         if start_date:
@@ -55,12 +56,31 @@ class OuraClient:
             url += "?" + "&".join(params)
 
         req = urllib.request.Request(url, headers=self.headers)
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                return data.get("data", [])
-        except urllib.error.HTTPError as e:
-            raise Exception(f"HTTP Error {e.code}: {e.reason}")
+        
+        for attempt in range(max_retries):
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return data.get("data", [])
+            except urllib.error.HTTPError as e:
+                if e.code == 429:
+                    # Rate limited - respect Retry-After header
+                    retry_after = int(e.headers.get("Retry-After", 60))
+                    if attempt < max_retries - 1:
+                        print(f"Rate limited. Waiting {retry_after}s before retry {attempt + 1}/{max_retries}...", file=sys.stderr)
+                        time.sleep(retry_after)
+                        continue
+                raise Exception(f"HTTP Error {e.code}: {e.reason}")
+            except urllib.error.URLError as e:
+                # Network error - exponential backoff
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # 1s, 2s, 4s
+                    print(f"Network error. Retrying in {wait_time}s... ({attempt + 1}/{max_retries})", file=sys.stderr)
+                    time.sleep(wait_time)
+                    continue
+                raise Exception(f"Network Error: {e.reason}")
+        
+        raise Exception(f"Failed after {max_retries} retries")
 
     def _get_with_cache(self, endpoint, start_date=None, end_date=None):
         """Get data with cache support (per-day caching)"""
