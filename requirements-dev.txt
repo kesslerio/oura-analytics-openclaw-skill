@@ -1,4 +1,4 @@
 # Development dependencies for Oura Analytics skill
 pytest>=7.0
 pytest-cov
-responses  # for mocking HTTP requests in tests
+pytz  # for timezone utilities in timezone_utils.py

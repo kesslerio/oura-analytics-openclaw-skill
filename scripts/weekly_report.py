@@ -167,7 +167,7 @@ def format_telegram_message(week_data, period):
     # Last 2 days
     last_2_days = week_data.get('last_2_days', [])
     if last_2_days:
-        msg += f"\n📅 *Last 2 Days:*\n"
+        msg += "\n📅 *Last 2 Days:*\n"
         for day_data in last_2_days:
             day = day_data.get('day', '')
             sleep = day_data.get('sleep_score', 'N/A')
@@ -231,7 +231,10 @@ def main():
         print(f"\n📊 Oura Weekly Report ({period})")
         sleep_trend = week_data.get('sleep_trend', 0)
         readiness_trend = week_data.get('readiness_trend', 0)
-        trend_symbol = lambda v: "↗️" if v > 0 else ("↘️" if v < 0 else "➡️")
+
+        def trend_symbol(v):
+            return "↗️" if v > 0 else ("↘️" if v < 0 else "➡️")
+
         print(f"   Sleep Score: {week_data['avg_sleep_score']} {trend_symbol(sleep_trend)} ({'+' if sleep_trend > 0 else ''}{sleep_trend})")
         print(f"   Readiness: {week_data['avg_readiness']} {trend_symbol(readiness_trend)} ({'+' if readiness_trend > 0 else ''}{readiness_trend})")
         print(f"   Efficiency: {week_data['avg_efficiency']}%")
@@ -240,7 +243,7 @@ def main():
         # Last 2 days
         last_2 = week_data.get('last_2_days', [])
         if last_2:
-            print(f"\n   📅 Last 2 Days:")
+            print("\n   📅 Last 2 Days:")
             for d in last_2:
                 ready = d.get('readiness')
                 print(f"      {d['day']}: 😴{d['sleep_score']} ⚡{ready}/100 ⏰{d['hours']}h")
