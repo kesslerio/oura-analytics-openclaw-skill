@@ -320,3 +320,141 @@ def _get_low_contributors(readiness: ReadinessRecord) -> List[str]:
     }
     
     return [k for k, v in contributors.items() if v is not None and v < 70]
+
+
+def format_hybrid_briefing(
+    night: NightRecord, 
+    baseline: Optional[Baseline] = None,
+    week_data: Optional[Dict[str, Any]] = None
+) -> str:
+    """
+    Format a hybrid daily report combining morning briefing with trend snapshot.
+    
+    This combines:
+    1) Morning Briefing (top): actionable daily guidance with driver analysis
+    2) Trend Snapshot (bottom): 7-day averages + recent sleep/readiness history
+    
+    Args:
+        night: NightRecord for the day
+        baseline: Optional baseline metrics
+        week_data: Optional pre-calculated 7-day statistics
+    
+    Returns:
+        Hybrid briefing string (≤12 lines for chat readability)
+    """
+    formatter = BriefingFormatter(baseline)
+    
+    lines = []
+    
+    # === SECTION 1: Morning Briefing ===
+    lines.append(f"☀️  Morning Briefing ({_format_date(night.date)})")
+    
+    # Sleep line with delta
+    if night.sleep:
+        hours = night.sleep.total_sleep_hours
+        h = int(hours)
+        m = int((hours - h) * 60)
+        delta_min = int((hours - formatter.baseline.avg_sleep_hours) * 60)
+        if abs(delta_min) < 15:
+            delta_str = "on target"
+        elif delta_min > 0:
+            delta_str = f"↑{delta_min}min vs avg"
+        else:
+            delta_str = f"↓{abs(delta_min)}min vs avg"
+        sleep_indicator = "✓" if abs(delta_min) < 60 else "○"
+        lines.append(f"Sleep: {h}h {m}m ({delta_str}) {sleep_indicator}")
+    
+    # Readiness line with delta
+    if night.readiness:
+        score = night.readiness.score
+        delta = score - formatter.baseline.avg_readiness
+        if abs(delta) < 3:
+            delta_str = "stable"
+        elif delta > 0:
+            delta_str = f"↑{int(delta)} vs baseline"
+        else:
+            delta_str = f"↓{abs(int(delta))} vs baseline"
+        ready_indicator = "✓" if score >= 70 else "○"
+        lines.append(f"Readiness: {score} ({delta_str}) {ready_indicator}")
+        
+        # Driver analysis (compact)
+        drivers = _get_low_contributors(night.readiness)
+        if drivers:
+            lines.append(f"└─ Driven by: {', '.join(drivers[:2])}")
+        else:
+            lines.append("└─ All contributors balanced")
+    
+    # Recovery status + recommendation
+    status, recommendation = formatter._get_status_and_recommendation(night)
+    lines.append(f"Recovery Status: {status}")
+    lines.append(f"Recommendation: {recommendation}")
+    
+    # === SECTION 2: Trend Snapshot ===
+    if week_data:
+        lines.append("")
+        lines.append("— Trend Snapshot (7-day avg)")
+        
+        # 7-day averages with delta arrows
+        avg_sleep = week_data.get("avg_sleep_score")
+        avg_readiness = week_data.get("avg_readiness")
+        avg_duration = week_data.get("avg_duration")
+        avg_efficiency = week_data.get("avg_efficiency")
+        avg_hrv = week_data.get("avg_hrv")
+        
+        # Sleep score with trend
+        sleep_trend = week_data.get("sleep_trend", 0)
+        if avg_sleep:
+            trend_arrow = _trend_arrow(sleep_trend)
+            lines.append(f"Sleep Score: {avg_sleep} {trend_arrow}")
+        
+        # Readiness with trend
+        readiness_trend = week_data.get("readiness_trend", 0)
+        if avg_readiness:
+            trend_arrow = _trend_arrow(readiness_trend)
+            lines.append(f"Readiness: {avg_readiness} {trend_arrow}")
+        
+        # Avg sleep duration
+        if avg_duration:
+            lines.append(f"Avg Sleep: {avg_duration}h")
+        
+        # Efficiency
+        if avg_efficiency:
+            lines.append(f"Efficiency: {avg_efficiency}%")
+        
+        # HRV
+        if avg_hrv:
+            lines.append(f"HRV: {avg_hrv}ms")
+        
+        # Last 2 nights
+        last_2_days = week_data.get("last_2_days", [])
+        if last_2_days and len(last_2_days) >= 2:
+            d1 = last_2_days[-2]
+            d2 = last_2_days[-1]
+            d1_sleep = d1.get("sleep_score", "N/A")
+            d1_ready = d1.get("readiness", "N/A")
+            d2_sleep = d2.get("sleep_score", "N/A")
+            d2_ready = d2.get("readiness", "N/A")
+            
+            # Format: "Recent Sleep: YYYY-MM-DD: 81, YYYY-MM-DD: 93"
+            d1_date = d1.get("day", "")[-5:]  # MM-DD
+            d2_date = d2.get("day", "")[-5:]
+            lines.append(f"Recent Sleep: {d1_date}: {d1_sleep}, {d2_date}: {d2_sleep}")
+            lines.append(f"Recent Readiness: {d1_date}: {d1_ready}, {d2_date}: {d2_ready}")
+    
+    return "\n".join(lines)
+
+
+def _format_date(date_str: str) -> str:
+    """Format date string for display."""
+    dt = datetime.strptime(date_str, "%Y-%m-%d")
+    return dt.strftime("%b %d")
+
+
+def _trend_arrow(trend: float) -> str:
+    """Get arrow indicator for trend value."""
+    if trend > 1:
+        return "↑"  # Trending up
+    elif trend < -1:
+        return "↓"  # Trending down
+    else:
+        return "→"  # Stable
