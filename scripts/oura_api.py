@@ -187,8 +187,8 @@ class OuraReporter:
     def __init__(self, client):
         self.client = client
 
-    def generate_report(self, report_type="weekly", days=None):
-        """Generate report"""
+    def generate_report(self, report_type="weekly", days=None, user_tz=None):
+        """Generate report with timezone awareness"""
         if not days:
             days = 7 if report_type == "weekly" else 30
 
@@ -202,9 +202,25 @@ class OuraReporter:
         analyzer = OuraAnalyzer(sleep, readiness, activity)
         summary = analyzer.summary()
 
+        # Get timezone info
+        if user_tz is None:
+            import os
+            user_tz = os.environ.get("USER_TIMEZONE", "America/Los_Angeles")
+
+        # Detect potential travel days
+        try:
+            from timezone_utils import is_travel_day
+            travel_days = is_travel_day(sleep)
+            # Convert date objects to strings for JSON serialization
+            travel_days = [d.isoformat() for d in travel_days]
+        except ImportError:
+            travel_days = []
+
         return {
             "report_type": report_type,
             "period": f"{start_date} to {end_date}",
+            "timezone": user_tz,
+            "travel_days": travel_days,
             "summary": summary,
             "daily_data": {
                 "sleep": sleep,
@@ -221,6 +237,8 @@ def main():
     parser.add_argument("--days", type=int, default=7, help="Number of days")
     parser.add_argument("--type", default="weekly", help="Report type")
     parser.add_argument("--token", help="Oura API token")
+    parser.add_argument("--timezone", help="User timezone (default: USER_TIMEZONE env or America/Los_Angeles)")
+    parser.add_argument("--local-time", action="store_true", help="Show dates in local time instead of UTC")
 
     args = parser.parse_args()
 
@@ -232,6 +250,15 @@ def main():
 
         if args.command == "sleep":
             data = client.get_sleep(start_date, end_date)
+            # Optionally convert to local time
+            if args.local_time:
+                from timezone_utils import get_canonical_day
+                for record in data:
+                    bedtime_start = record.get("bedtime_start", "")
+                    if bedtime_start:
+                        _, local_dt = get_canonical_day(bedtime_start, args.timezone)
+                        if local_dt:
+                            record["local_bedtime_start"] = local_dt.isoformat()
             print(json.dumps(data, indent=2))
 
         elif args.command == "daily_sleep":
@@ -248,22 +275,17 @@ def main():
 
         elif args.command == "summary":
             sleep = client.get_sleep(start_date, end_date)
-            # readiness = client.get_readiness(start_date, end_date) # Unused in analyzer currently if passing only sleep
             analyzer = OuraAnalyzer(sleep)
             summary = analyzer.summary()
             print(json.dumps(summary, indent=2))
 
         elif args.command == "comparison":
-            # Fetch 2x days
             doubled_days = args.days * 2
             start_date_extended = (datetime.now() - timedelta(days=doubled_days)).strftime("%Y-%m-%d")
 
             sleep = client.get_sleep(start_date_extended, end_date)
-
-            # Sort by date
             sleep = sorted(sleep, key=lambda x: x.get('day'))
 
-            # Split into Current (last N days) and Previous (N days before that)
             current_sleep = sleep[-args.days:] if len(sleep) > 0 else []
             previous_sleep = sleep[:-args.days][-args.days:] if len(sleep) > args.days else []
 
@@ -290,7 +312,7 @@ def main():
 
         elif args.command == "report":
             reporter = OuraReporter(client)
-            report = reporter.generate_report(args.type, args.days)
+            report = reporter.generate_report(args.type, args.days, user_tz=args.timezone)
             print(json.dumps(report, indent=2))
 
     except ValueError as e:
