@@ -9,17 +9,13 @@ import argparse
 import os
 import sys
 import json
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from pathlib import Path
 
 # Add scripts directory to path for imports
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-try:
-    import requests
-except ImportError:
-    print("Install requests: pip install requests")
-    sys.exit(1)
 
 from oura_api import OuraClient
 
@@ -188,18 +184,24 @@ def format_telegram_message(week_data, period):
 
 
 def send_telegram(message, chat_id=None, bot_token=None):
-    """Send report to Telegram"""
+    """Send report to Telegram using urllib"""
     chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
     bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
-    
+
     if not chat_id or not bot_token:
         print("TELEGRAM_CHAT_ID or TELEGRAM_BOT_TOKEN not set")
         return False
-    
+
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
-    resp = requests.post(url, json=data)
-    return resp.status_code == 200
+    data = json.dumps({"chat_id": int(chat_id), "text": message, "parse_mode": "Markdown"}).encode("utf-8")
+
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return resp.status == 200
+    except urllib.error.HTTPError:
+        return False
 
 
 def main():
