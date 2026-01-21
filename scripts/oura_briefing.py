@@ -53,16 +53,17 @@ def main():
         readiness_data = client.get_readiness(target_date, target_date)
         activity_data = client.get_activity(target_date, target_date)
         
+        # Bounds check: ensure arrays are not empty before accessing
         if not sleep_data and not readiness_data:
             print(f"No data available for {target_date}", file=sys.stderr)
             sys.exit(1)
         
-        # Create night record
+        # Create night record (safe access with bounds check)
         night = create_night_record(
             date=target_date,
-            sleep=sleep_data[0] if sleep_data else None,
-            readiness=readiness_data[0] if readiness_data else None,
-            activity=activity_data[0] if activity_data else None
+            sleep=sleep_data[0] if (sleep_data and len(sleep_data) > 0) else None,
+            readiness=readiness_data[0] if (readiness_data and len(readiness_data) > 0) else None,
+            activity=activity_data[0] if (activity_data and len(activity_data) > 0) else None
         )
         
         # Calculate baseline from historical data
@@ -72,16 +73,20 @@ def main():
         baseline_sleep = client.get_sleep(baseline_start, baseline_end)
         baseline_readiness = client.get_readiness(baseline_start, baseline_end)
         
-        # Create baseline nights for calculation
+        # Create baseline nights for calculation (align by date, not index)
         baseline_nights = []
-        for i in range(len(baseline_sleep)):
-            if i < len(baseline_readiness):
-                baseline_night = create_night_record(
-                    date=baseline_sleep[i]["day"],
-                    sleep=baseline_sleep[i],
-                    readiness=baseline_readiness[i]
-                )
-                baseline_nights.append(baseline_night)
+        readiness_by_date = {r["day"]: r for r in baseline_readiness}
+        
+        for sleep_entry in baseline_sleep:
+            date = sleep_entry["day"]
+            readiness_entry = readiness_by_date.get(date)
+            
+            baseline_night = create_night_record(
+                date=date,
+                sleep=sleep_entry,
+                readiness=readiness_entry
+            )
+            baseline_nights.append(baseline_night)
         
         baseline = Baseline.from_history(baseline_nights) if baseline_nights else None
         

@@ -10,8 +10,14 @@ Generates concise, actionable daily briefings with:
 - Pattern detection (trends, streaks)
 """
 
-from typing import Optional, Dict, Any, List
+import sys
+from pathlib import Path
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime, timedelta
+
+# Add scripts dir to path for imports
+sys.path.insert(0, str(Path(__file__).parent))
+
 from schema import NightRecord, SleepRecord, ReadinessRecord, ActivityRecord
 
 
@@ -30,21 +36,34 @@ class Baseline:
     
     @classmethod
     def from_history(cls, nights: List[NightRecord]) -> 'Baseline':
-        """Calculate baseline from historical night records."""
+        """Calculate baseline from historical night records with outlier removal."""
         if not nights:
             return cls()
         
-        # Calculate averages
-        sleep_hours = [n.sleep.total_sleep_hours for n in nights if n.sleep]
-        readiness_scores = [n.readiness.score for n in nights if n.readiness]
-        hrv_values = [n.sleep.average_hrv_ms for n in nights if n.sleep and n.sleep.average_hrv_ms]
-        rhr_values = [n.sleep.lowest_heart_rate_bpm for n in nights if n.sleep and n.sleep.lowest_heart_rate_bpm]
+        # Calculate averages with outlier removal (remove top/bottom 10% if sample is large enough)
+        sleep_hours = sorted([n.sleep.total_sleep_hours for n in nights if n.sleep])
+        readiness_scores = sorted([n.readiness.score for n in nights if n.readiness])
+        hrv_values = sorted([n.sleep.average_hrv_ms for n in nights if n.sleep and n.sleep.average_hrv_ms])
+        rhr_values = sorted([n.sleep.lowest_heart_rate_bpm for n in nights if n.sleep and n.sleep.lowest_heart_rate_bpm])
+        
+        def robust_avg(values: List[float], default: float) -> float:
+            """Calculate average with outlier removal (trim 10% from each end if n >= 10)."""
+            if not values:
+                return default
+            if len(values) < 10:
+                # Too few samples for outlier removal
+                return sum(values) / len(values)
+            
+            # Remove top/bottom 10%
+            trim = max(1, int(len(values) * 0.1))
+            trimmed = values[trim:-trim]
+            return sum(trimmed) / len(trimmed)
         
         return cls(
-            avg_sleep_hours=sum(sleep_hours) / len(sleep_hours) if sleep_hours else 7.5,
-            avg_readiness=sum(readiness_scores) / len(readiness_scores) if readiness_scores else 75.0,
-            avg_hrv=sum(hrv_values) / len(hrv_values) if hrv_values else 40.0,
-            avg_rhr=sum(rhr_values) / len(rhr_values) if rhr_values else 60.0
+            avg_sleep_hours=robust_avg(sleep_hours, 7.5),
+            avg_readiness=robust_avg(readiness_scores, 75.0),
+            avg_hrv=robust_avg(hrv_values, 40.0),
+            avg_rhr=robust_avg(rhr_values, 60.0)
         )
 
 
@@ -173,7 +192,7 @@ class BriefingFormatter:
         else:
             return "└─ All contributors balanced"
     
-    def _get_status_and_recommendation(self, night: NightRecord) -> tuple[str, str]:
+    def _get_status_and_recommendation(self, night: NightRecord) -> Tuple[str, str]:
         """Determine recovery status and recommendation."""
         if not night.readiness:
             return "UNKNOWN", "Insufficient data"
@@ -260,8 +279,9 @@ def format_json_briefing(night: NightRecord, baseline: Optional[Baseline] = None
     formatter = BriefingFormatter(baseline)
     status, recommendation = formatter._get_status_and_recommendation(night)
     
-    # Remove emoji from status
-    status_code = status.split()[-1]  # GREEN, YELLOW, RED
+    # Extract status code (remove emoji)
+    # Status format: "🟢 GREEN" → "GREEN"
+    status_code = status.split()[-1] if status else "UNKNOWN"
     
     briefing = {
         "date": night.date,
