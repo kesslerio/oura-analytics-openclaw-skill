@@ -216,7 +216,102 @@ See `references/metrics.md` for full definitions.
 - **`scripts/alerts.py`** - Threshold-based alerting CLI
 - **`scripts/weekly_report.py`** - Weekly report generator
 - **`scripts/telegram_bot.py`** - Optional Telegram bot integration
+- **`scripts/data_manager.py`** - Data storage and privacy controls
+- **`scripts/oura_data.py`** - Data management CLI
+- **`scripts/schema.py`** - Canonical data structures with unit normalization
 - **`references/`** - API docs, metric definitions
+
+## Data Management & Privacy
+
+### What Data is Stored
+
+All data is stored locally in `~/.oura-analytics/`:
+
+```
+~/.oura-analytics/
+├── cache/                  # Cached API responses (90 days default)
+│   ├── sleep/             # Sleep records by date (YYYY-MM-DD.json)
+│   ├── daily_readiness/   # Readiness records
+│   └── daily_activity/    # Activity records
+├── events.jsonl           # User-logged events (optional)
+├── config.yaml            # User preferences (optional)
+└── alert_state.json       # Alert tracking (optional)
+```
+
+**No data is sent to third parties.** All Oura data stays on your local machine.
+
+### View Storage Info
+
+```bash
+python scripts/oura_data.py info
+```
+
+Output:
+```
+Data directory: /home/user/.oura-analytics
+Total size: 187.1 KB
+
+Cache:
+  Size: 187.1 KB
+  Files: 21
+  sleep: 7 files, 46.4 KB, 2026-01-14 to 2026-01-20
+  daily_readiness: 7 files, 3.6 KB, 2026-01-14 to 2026-01-20
+  daily_activity: 7 files, 137.2 KB, 2026-01-14 to 2026-01-20
+```
+
+### Export Data (Backup)
+
+Export all local data to a single JSON file:
+
+```bash
+# Full backup
+python scripts/oura_data.py export --output backup.json
+
+# Compressed tarball
+python scripts/oura_data.py export --output backup.tar.gz --format tar.gz
+
+# Export events only
+python scripts/oura_data.py export-events --output events.csv --format csv
+```
+
+### Clear Data (Privacy)
+
+```bash
+# Clear cache only (keeps events/config)
+python scripts/oura_data.py clear-cache --confirm
+
+# Clear specific endpoint
+python scripts/oura_data.py clear-cache --endpoint sleep --confirm
+
+# Clear events
+python scripts/oura_data.py clear-events --confirm
+
+# Clear ALL local data
+python scripts/oura_data.py clear-all --confirm
+```
+
+**Important:** All clear commands require `--confirm` flag to prevent accidental deletion.
+
+### Automatic Cleanup
+
+Delete cached data older than 90 days:
+
+```bash
+# Default: 90 days
+python scripts/oura_data.py cleanup
+
+# Custom retention period
+python scripts/oura_data.py cleanup --days 180
+```
+
+### GDPR Compliance
+
+- ✅ **Data ownership:** You own your data (local storage only)
+- ✅ **Data retention:** You control retention (manual cleanup)
+- ✅ **No data sharing:** No third-party services
+- ✅ **Right to deletion:** Clear data anytime with `clear-all`
+
+**Note:** This skill is NOT HIPAA-compliant. Do not use for medical decision-making. Consult healthcare professionals for health concerns.
 
 ## Troubleshooting
 
