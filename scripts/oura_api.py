@@ -19,16 +19,28 @@ from pathlib import Path
 
 SKILL_DIR = Path(__file__).parent.parent
 
+# Import cache if available
+try:
+    from cache import OuraCache
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
 class OuraClient:
     """Oura Cloud API client"""
 
     BASE_URL = "https://api.ouraring.com/v2/usercollection"
 
-    def __init__(self, token=None):
+    def __init__(self, token=None, use_cache=True):
         self.token = token or os.environ.get("OURA_API_TOKEN")
         if not self.token:
             raise ValueError("OURA_API_TOKEN not set. Get it at https://cloud.ouraring.com/personal-access-token")
         self.headers = {"Authorization": f"Bearer {self.token}"}
+        
+        # Initialize cache
+        self.cache = None
+        if use_cache and CACHE_AVAILABLE:
+            self.cache = OuraCache()
 
     def _request(self, endpoint, start_date=None, end_date=None):
         """Make API request using urllib"""
@@ -50,21 +62,108 @@ class OuraClient:
         except urllib.error.HTTPError as e:
             raise Exception(f"HTTP Error {e.code}: {e.reason}")
 
+    def _get_with_cache(self, endpoint, start_date=None, end_date=None):
+        """Get data with cache support (per-day caching)"""
+        if not self.cache or not start_date or not end_date:
+            # No cache or no date range - fetch directly
+            return self._request(endpoint, start_date, end_date)
+
+        # Generate date range
+        start = datetime.strptime(start_date, "%Y-%m-%d")
+        end = datetime.strptime(end_date, "%Y-%m-%d")
+        date_list = []
+        current = start
+        while current <= end:
+            date_list.append(current.strftime("%Y-%m-%d"))
+            current += timedelta(days=1)
+
+        # Check cache for each day
+        cached_data = []
+        missing_dates = []
+        for date_str in date_list:
+            cached = self.cache.get(endpoint, date_str)
+            if cached is not None:
+                cached_data.extend(cached)
+            else:
+                missing_dates.append(date_str)
+
+        # Fetch missing dates
+        if missing_dates:
+            # Fetch all missing dates in one API call
+            fetch_start = min(missing_dates)
+            fetch_end = max(missing_dates)
+            fresh_data = self._request(endpoint, fetch_start, fetch_end)
+            
+            # Cache each day individually
+            for item in fresh_data:
+                item_date = item.get("day") or item.get("timestamp", "")[:10]
+                if item_date:
+                    # Cache this day's data
+                    day_data = [i for i in fresh_data if (i.get("day") or i.get("timestamp", "")[:10]) == item_date]
+                    self.cache.set(endpoint, item_date, day_data)
+            
+            cached_data.extend(fresh_data)
+
+        return cached_data
+
+    def sync(self, endpoint, days=7):
+        """
+        Incrementally sync data for endpoint.
+        
+        Args:
+            endpoint: API endpoint (sleep, daily_readiness, daily_activity)
+            days: Number of days to sync (default: 7)
+        
+        Returns:
+            Number of new days cached
+        """
+        if not self.cache:
+            raise ValueError("Cache not available")
+
+        # Get last sync date
+        last_sync = self.cache.get_last_sync(endpoint)
+        
+        if last_sync:
+            # Sync from last sync date to today
+            start_date = last_sync
+        else:
+            # First sync - get last N days
+            start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # Fetch and cache
+        data = self._request(endpoint, start_date, end_date)
+        
+        # Cache per day
+        cached_days = set()
+        for item in data:
+            item_date = item.get("day") or item.get("timestamp", "")[:10]
+            if item_date and item_date not in cached_days:
+                day_data = [i for i in data if (i.get("day") or i.get("timestamp", "")[:10]) == item_date]
+                self.cache.set(endpoint, item_date, day_data)
+                cached_days.add(item_date)
+        
+        # Update last sync
+        self.cache.set_last_sync(endpoint, end_date)
+        
+        return len(cached_days)
+
     def get_sleep(self, start_date=None, end_date=None):
         """Fetch sleep data (summary)"""
-        return self._request("sleep", start_date, end_date)
+        return self._get_with_cache("sleep", start_date, end_date)
 
     def get_daily_sleep(self, start_date=None, end_date=None):
         """Fetch detailed sleep data"""
-        return self._request("daily_sleep", start_date, end_date)
+        return self._get_with_cache("daily_sleep", start_date, end_date)
 
     def get_readiness(self, start_date=None, end_date=None):
         """Fetch readiness data"""
-        return self._request("daily_readiness", start_date, end_date)
+        return self._get_with_cache("daily_readiness", start_date, end_date)
 
     def get_activity(self, start_date=None, end_date=None):
         """Fetch activity data"""
-        return self._request("daily_activity", start_date, end_date)
+        return self._get_with_cache("daily_activity", start_date, end_date)
 
     def get_hrv(self, start_date=None, end_date=None):
         """Fetch HRV data"""
@@ -232,18 +331,22 @@ class OuraReporter:
 
 def main():
     parser = argparse.ArgumentParser(description="Oura Analytics CLI")
-    parser.add_argument("command", choices=["sleep", "daily_sleep", "readiness", "activity", "report", "summary", "comparison"],
+    parser.add_argument("command", choices=["sleep", "daily_sleep", "readiness", "activity", "report", "summary", "comparison", "sync", "cache"],
                        help="Data type to fetch or report type")
     parser.add_argument("--days", type=int, default=7, help="Number of days")
     parser.add_argument("--type", default="weekly", help="Report type")
     parser.add_argument("--token", help="Oura API token")
     parser.add_argument("--timezone", help="User timezone (default: USER_TIMEZONE env or America/Los_Angeles)")
     parser.add_argument("--local-time", action="store_true", help="Show dates in local time instead of UTC")
+    parser.add_argument("--endpoint", choices=["sleep", "daily_readiness", "daily_activity", "all"], help="Endpoint for sync/cache commands")
+    parser.add_argument("--clear", action="store_true", help="Clear cache (for cache command)")
+    parser.add_argument("--no-cache", action="store_true", help="Disable cache for this request")
 
     args = parser.parse_args()
 
     try:
-        client = OuraClient(args.token)
+        use_cache = not args.no_cache
+        client = OuraClient(args.token, use_cache=use_cache)
 
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
@@ -314,6 +417,47 @@ def main():
             reporter = OuraReporter(client)
             report = reporter.generate_report(args.type, args.days, user_tz=args.timezone)
             print(json.dumps(report, indent=2))
+
+        elif args.command == "sync":
+            if not CACHE_AVAILABLE:
+                print("Error: Cache not available", file=sys.stderr)
+                sys.exit(1)
+            
+            endpoints = ["sleep", "daily_readiness", "daily_activity"] if args.endpoint == "all" else [args.endpoint or "sleep"]
+            
+            results = {}
+            for endpoint in endpoints:
+                cached_days = client.sync(endpoint, args.days)
+                results[endpoint] = cached_days
+                print(f"{endpoint}: synced {cached_days} days")
+            
+            print(json.dumps(results, indent=2))
+
+        elif args.command == "cache":
+            if not CACHE_AVAILABLE or not client.cache:
+                print("Error: Cache not available", file=sys.stderr)
+                sys.exit(1)
+            
+            if args.clear:
+                # Clear cache for endpoint or all
+                deleted = client.cache.clear(args.endpoint if args.endpoint != "all" else None)
+                print(f"Cleared {deleted} cached files")
+            else:
+                # Show cache stats
+                cache_dir = client.cache.cache_dir
+                if cache_dir.exists():
+                    stats = {}
+                    for endpoint_dir in cache_dir.iterdir():
+                        if endpoint_dir.is_dir():
+                            files = list(endpoint_dir.glob("*.json"))
+                            last_sync = client.cache.get_last_sync(endpoint_dir.name)
+                            stats[endpoint_dir.name] = {
+                                "cached_days": len(files),
+                                "last_sync": last_sync
+                            }
+                    print(json.dumps(stats, indent=2))
+                else:
+                    print("Cache empty")
 
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
