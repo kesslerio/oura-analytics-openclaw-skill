@@ -32,10 +32,10 @@ def _seconds_to_hours(seconds):
 
 
 def _calculate_sleep_score(day):
-    """Calculate sleep score from day record."""
-    efficiency = day.get("efficiency", 0)
+    """Calculate sleep score from day record. Guards against null efficiency."""
+    efficiency = day.get("efficiency") or 0  # Handle None/null values
     duration_hours = _seconds_to_hours(day.get("total_sleep_duration", 0)) or 0
-    eff_score = min(efficiency, 100)
+    eff_score = min(efficiency, 100) if efficiency else 0
     dur_score = min(duration_hours / 8 * 100, 100)
     return round((eff_score * 0.6) + (dur_score * 0.4), 1)
 
@@ -56,9 +56,9 @@ def _analyze_week(sleep_data, readiness_data=None):
             score = round(dur_score, 1)
         scores.append(score)
     
-    # Get efficiency
-    efficiencies = [d.get("efficiency", 0) for d in sleep_data]
-    avg_efficiency = round(sum(efficiencies) / len(efficiencies), 1) if efficiencies and any(efficiencies) else None
+    # Get efficiency (handle None/null values)
+    efficiencies = [d.get("efficiency") or 0 for d in sleep_data]
+    avg_efficiency = round(sum(efficiencies) / len(efficiencies), 1) if efficiencies else None
     
     # Get durations
     durations = [_seconds_to_hours(d.get("total_sleep_duration", 0)) for d in sleep_data]
@@ -195,10 +195,10 @@ def main():
         
         baseline = Baseline.from_history(baseline_nights) if baseline_nights else None
         
-        # Fetch week data for hybrid format
+        # Fetch week data for hybrid format (7-day window: target_date - 6 through target_date)
         week_data = None
         if args.format == "hybrid":
-            week_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=7)).strftime("%Y-%m-%d")
+            week_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
             week_sleep = client.get_sleep(week_start, target_date)
             week_readiness = client.get_readiness(week_start, target_date)
             week_data = _analyze_week(week_sleep, week_readiness)
