@@ -31,7 +31,7 @@ jobs:
         run: ruff check scripts/ tests/
 
       - name: Upload coverage
-        if: always()
+        if: always() && github.event_name == 'push'
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage.xml
