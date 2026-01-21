@@ -18,8 +18,17 @@ import urllib.error
 from datetime import datetime, timedelta
 from pathlib import Path
 from email.utils import parsedate_to_datetime
+from enum import Enum
 
 SKILL_DIR = Path(__file__).parent.parent
+
+
+class OutputMode(Enum):
+    """Output format modes for Clawdbot integration"""
+    BRIEF = "brief"      # 5-8 line human summary
+    JSON = "json"        # Full structured data (default)
+    ALERT = "alert"      # Only if something needs attention
+    SILENT = "silent"    # Exit code only (for cron)
 
 # Import cache if available
 try:
@@ -374,6 +383,73 @@ class OuraReporter:
         }
 
 
+def format_output(data, mode: OutputMode = OutputMode.JSON):
+    """Format output based on mode"""
+    if mode == OutputMode.JSON:
+        return json.dumps(data, indent=2)
+    
+    elif mode == OutputMode.BRIEF:
+        # Human-readable brief summary
+        if isinstance(data, dict):
+            if "summary" in data:
+                # Report format
+                s = data["summary"]
+                lines = [
+                    f"📊 {data.get('report_type', 'Report').title()} ({data.get('period', 'N/A')})",
+                    f"Sleep: {s.get('avg_sleep_hours', 'N/A')}h avg, {s.get('avg_sleep_score', 'N/A')} score",
+                    f"Readiness: {s.get('avg_readiness_score', 'N/A')}",
+                    f"Efficiency: {s.get('avg_sleep_efficiency', 'N/A')}%",
+                    f"HRV: {s.get('avg_hrv', 'N/A')} ms",
+                    f"Days: {s.get('days_tracked', 0)}"
+                ]
+                if data.get("travel_days"):
+                    lines.append(f"Travel: {', '.join(data['travel_days'])}")
+                return "\n".join(lines)
+            elif "avg_sleep_score" in data or "avg_sleep_hours" in data:
+                # Summary command output - prioritize key metrics
+                key_order = ["avg_sleep_score", "avg_readiness_score", "avg_sleep_hours", 
+                            "avg_sleep_efficiency", "avg_hrv", "days_tracked"]
+                lines = []
+                for key in key_order:
+                    if key in data:
+                        lines.append(f"{key}: {data[key]}")
+                return "\n".join(lines)
+            else:
+                # Generic dict - show first 6 items
+                lines = [f"{k}: {v}" for k, v in list(data.items())[:6]]
+                return "\n".join(lines)
+        elif isinstance(data, list):
+            return f"{len(data)} records"
+        return str(data)
+    
+    elif mode == OutputMode.ALERT:
+        # Only output if something needs attention
+        # Handle both nested report summary and flat summary command
+        s = data.get("summary", data) if isinstance(data, dict) else {}
+        
+        # Ensure we are looking at a summary-like object before checking thresholds
+        if isinstance(s, dict) and ("avg_sleep_score" in s or "avg_sleep_hours" in s):
+            alerts = []
+            
+            # Check for concerning metrics
+            if s.get("avg_sleep_hours") and s["avg_sleep_hours"] < 6:
+                alerts.append(f"⚠️  Low sleep: {s['avg_sleep_hours']}h avg")
+            if s.get("avg_readiness_score") and s["avg_readiness_score"] < 70:
+                alerts.append(f"⚠️  Low readiness: {s['avg_readiness_score']}")
+            if s.get("avg_sleep_efficiency") and s["avg_sleep_efficiency"] < 80:
+                alerts.append(f"⚠️  Low efficiency: {s['avg_sleep_efficiency']}%")
+            
+            if alerts:
+                return "\n".join(alerts)
+        return ""  # No alerts or not a summary
+    
+    elif mode == OutputMode.SILENT:
+        # No output - exit code only
+        return ""
+    
+    return json.dumps(data, indent=2)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Oura Analytics CLI")
     parser.add_argument("command", choices=["sleep", "daily_sleep", "readiness", "activity", "report", "summary", "comparison", "sync", "cache"],
@@ -386,12 +462,17 @@ def main():
     parser.add_argument("--endpoint", choices=["sleep", "daily_readiness", "daily_activity", "all"], help="Endpoint for sync/cache commands")
     parser.add_argument("--clear", action="store_true", help="Clear cache (for cache command)")
     parser.add_argument("--no-cache", action="store_true", help="Disable cache for this request")
+    parser.add_argument("--format", choices=["json", "brief", "alert", "silent"], default="json", 
+                       help="Output format (json=full data, brief=human summary, alert=warnings only, silent=exit code)")
 
     args = parser.parse_args()
 
     try:
         use_cache = not args.no_cache
         client = OuraClient(args.token, use_cache=use_cache)
+        
+        # Parse output mode
+        output_mode = OutputMode(args.format)
 
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
@@ -407,25 +488,35 @@ def main():
                         _, local_dt = get_canonical_day(bedtime_start, args.timezone)
                         if local_dt:
                             record["local_bedtime_start"] = local_dt.isoformat()
-            print(json.dumps(data, indent=2))
+            output = format_output(data, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "daily_sleep":
             data = client.get_daily_sleep(start_date, end_date)
-            print(json.dumps(data, indent=2))
+            output = format_output(data, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "readiness":
             data = client.get_readiness(start_date, end_date)
-            print(json.dumps(data, indent=2))
+            output = format_output(data, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "activity":
             data = client.get_activity(start_date, end_date)
-            print(json.dumps(data, indent=2))
+            output = format_output(data, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "summary":
             sleep = client.get_sleep(start_date, end_date)
             analyzer = OuraAnalyzer(sleep)
             summary = analyzer.summary()
-            print(json.dumps(summary, indent=2))
+            output = format_output(summary, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "comparison":
             doubled_days = args.days * 2
@@ -452,16 +543,21 @@ def main():
                 else:
                     diff[key] = None
 
-            print(json.dumps({
+            comparison = {
                 "current": summary_curr,
                 "previous": summary_prev,
                 "diff": diff
-            }, indent=2))
+            }
+            output = format_output(comparison, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "report":
             reporter = OuraReporter(client)
             report = reporter.generate_report(args.type, args.days, user_tz=args.timezone)
-            print(json.dumps(report, indent=2))
+            output = format_output(report, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "sync":
             if not CACHE_AVAILABLE:
@@ -474,9 +570,12 @@ def main():
             for endpoint in endpoints:
                 cached_days = client.sync(endpoint, args.days)
                 results[endpoint] = cached_days
-                print(f"{endpoint}: synced {cached_days} days")
+                if output_mode != OutputMode.SILENT:
+                    print(f"{endpoint}: synced {cached_days} days", file=sys.stderr)
             
-            print(json.dumps(results, indent=2))
+            output = format_output(results, output_mode)
+            if output:
+                print(output)
 
         elif args.command == "cache":
             if not CACHE_AVAILABLE or not client.cache:
