@@ -207,10 +207,10 @@ class OuraReporter:
             import os
             user_tz = os.environ.get("USER_TIMEZONE", "America/Los_Angeles")
 
-        # Detect potential travel days
+        # Detect potential travel days (use user-supplied timezone)
         try:
             from timezone_utils import is_travel_day
-            travel_days = is_travel_day(sleep)
+            travel_days = is_travel_day(sleep, user_tz=user_tz)
             # Convert date objects to strings for JSON serialization
             travel_days = [d.isoformat() for d in travel_days]
         except ImportError:

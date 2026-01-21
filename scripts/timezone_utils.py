@@ -79,13 +79,14 @@ def get_canonical_day_from_date_str(date_str: str, user_tz: Optional[str] = None
         return None
 
 
-def is_travel_day(sleep_records: list, threshold_hours: float = 3.0) -> List[date]:
+def is_travel_day(sleep_records: list, threshold_hours: float = 3.0, user_tz: Optional[str] = None) -> List[date]:
     """
     Detect potential travel days based on bedtime shifts.
 
     Args:
         sleep_records: List of sleep records with bedtime_start
         threshold_hours: Minimum hour shift to flag as potential travel
+        user_tz: User's timezone (default: from USER_TIMEZONE env or America/Los_Angeles)
 
     Returns:
         List of dates that may be travel days
@@ -94,7 +95,8 @@ def is_travel_day(sleep_records: list, threshold_hours: float = 3.0) -> List[dat
         return []
 
     travel_days = []
-    user_tz = get_user_timezone()
+    if user_tz is None:
+        user_tz = get_user_timezone()
 
     # Extract bedtimes in user's local hour
     bedtimes = []
