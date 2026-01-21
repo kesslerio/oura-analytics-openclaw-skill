@@ -3,13 +3,34 @@
 
 import pytest
 from pathlib import Path
-import responses  # Use responses library for HTTP mocking
+from unittest.mock import patch, MagicMock
+import json
 
 # Add scripts directory to path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from oura_api import OuraClient
+
+
+def make_mock_response(data, status=200):
+    """Create a mock urllib response object."""
+    mock_resp = MagicMock()
+    mock_resp.status = status
+    mock_resp.read.return_value = json.dumps({"data": data}).encode("utf-8")
+    # Fix context manager protocol: __enter__ must return the mock itself
+    mock_resp.__enter__.return_value = mock_resp
+    return mock_resp
+
+
+def make_mock_error(status=401):
+    """Create a mock urllib error."""
+    mock_resp = MagicMock()
+    mock_resp.code = status
+    mock_resp.reason = "Unauthorized"
+    mock_resp.__enter__ = lambda self: self
+    mock_resp.__exit__ = lambda self, *args: None
+    return mock_resp
 
 
 class TestOuraClient:
@@ -40,43 +61,40 @@ class TestOuraClient:
             if original:
                 os.environ["OURA_API_TOKEN"] = original
 
-    @responses.activate
-    def test_request_url_construction(self):
+    @patch("urllib.request.urlopen")
+    def test_request_url_construction(self, mock_urlopen):
         """Test that _request constructs URL correctly."""
-        responses.get(
-            "https://api.ouraring.com/v2/usercollection/sleep",
-            json={"data": [{"day": "2026-01-15", "score": 80}]}
-        )
+        mock_urlopen.return_value = make_mock_response([{"day": "2026-01-15", "score": 80}])
 
         client = OuraClient(token="test")
         result = client._request("sleep", "2026-01-01", "2026-01-15")
 
         assert len(result) == 1
         assert result[0]["day"] == "2026-01-15"
-        assert "start_date=2026-01-01" in responses.calls[0].request.url
-        assert "end_date=2026-01-15" in responses.calls[0].request.url
+        # Check that the URL was called with correct params
+        call_args = mock_urlopen.call_args
+        request_url = call_args[0][0].full_url if hasattr(call_args[0][0], 'full_url') else str(call_args[0][0])
+        assert "start_date=2026-01-01" in request_url
+        assert "end_date=2026-01-15" in request_url
 
-    @responses.activate
-    def test_get_sleep_no_dates(self):
+    @patch("urllib.request.urlopen")
+    def test_get_sleep_no_dates(self, mock_urlopen):
         """Test get_sleep returns all data when no dates specified."""
-        responses.get(
-            "https://api.ouraring.com/v2/usercollection/sleep",
-            json={"data": [{"day": "2026-01-10"}, {"day": "2026-01-11"}]}
-        )
+        mock_urlopen.return_value = make_mock_response([{"day": "2026-01-10"}, {"day": "2026-01-11"}])
 
         client = OuraClient(token="test")
         result = client.get_sleep()
 
         assert len(result) == 2
-        assert "start_date" not in responses.calls[0].request.url
+        # Check no date params in URL
+        call_args = mock_urlopen.call_args
+        request_url = call_args[0][0].full_url if hasattr(call_args[0][0], 'full_url') else str(call_args[0][0])
+        assert "start_date" not in request_url
 
-    @responses.activate
-    def test_get_readiness(self):
+    @patch("urllib.request.urlopen")
+    def test_get_readiness(self, mock_urlopen):
         """Test get_readiness method."""
-        responses.get(
-            "https://api.ouraring.com/v2/usercollection/daily_readiness",
-            json={"data": [{"day": "2026-01-15", "score": 75}]}
-        )
+        mock_urlopen.return_value = make_mock_response([{"day": "2026-01-15", "score": 75}])
 
         client = OuraClient(token="test")
         result = client.get_readiness("2026-01-01", "2026-01-15")
@@ -84,13 +102,10 @@ class TestOuraClient:
         assert len(result) == 1
         assert result[0]["score"] == 75
 
-    @responses.activate
-    def test_get_activity(self):
+    @patch("urllib.request.urlopen")
+    def test_get_activity(self, mock_urlopen):
         """Test get_activity method."""
-        responses.get(
-            "https://api.ouraring.com/v2/usercollection/daily_activity",
-            json={"data": [{"day": "2026-01-15", "score": 65}]}
-        )
+        mock_urlopen.return_value = make_mock_response([{"day": "2026-01-15", "score": 65}])
 
         client = OuraClient(token="test")
         result = client.get_activity("2026-01-01", "2026-01-15")
@@ -98,13 +113,13 @@ class TestOuraClient:
         assert len(result) == 1
         assert result[0]["score"] == 65
 
-    @responses.activate
-    def test_error_handling(self):
+    @patch("urllib.request.urlopen")
+    def test_error_handling(self, mock_urlopen):
         """Test that HTTP errors are raised."""
-        responses.get(
+        from urllib.error import HTTPError
+        mock_urlopen.side_effect = HTTPError(
             "https://api.ouraring.com/v2/usercollection/sleep",
-            status=401,
-            json={"error": "Unauthorized"}
+            401, "Unauthorized", {}, None
         )
 
         client = OuraClient(token="test")

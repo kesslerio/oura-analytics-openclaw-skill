@@ -31,7 +31,7 @@ jobs:
         run: ruff check scripts/ tests/
 
       - name: Upload coverage
-        if: always()
+        if: always() && github.event_name == 'push'
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage.xml
@@ -42,5 +42,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        run: pip install ruff
+
       - name: Run ruff linter
-        uses: chartboost/ruff-action@v1
+        run: ruff check scripts/ tests/
