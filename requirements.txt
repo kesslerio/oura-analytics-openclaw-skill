@@ -2,3 +2,4 @@
 # Note: Uses Python's built-in urllib.request (no external HTTP library)
 python-telegram-bot>=20.0
 pytz
+pyyaml
