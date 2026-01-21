@@ -17,7 +17,7 @@ class OuraCache:
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def get(self, endpoint: str, date: str) -> Optional[dict]:
+    def get(self, endpoint: str, date: str) -> Optional[list]:
         """
         Get cached data for endpoint and date.
 
@@ -26,7 +26,7 @@ class OuraCache:
             date: ISO date string (YYYY-MM-DD)
 
         Returns:
-            Cached data dict or None if not cached
+            Cached data list (Oura API returns data: []) or None if not cached
         """
         cache_file = self._get_cache_path(endpoint, date)
         if not cache_file.exists():
@@ -38,7 +38,7 @@ class OuraCache:
         except (json.JSONDecodeError, IOError):
             return None
 
-    def set(self, endpoint: str, date: str, data: dict) -> None:
+    def set(self, endpoint: str, date: str, data: list) -> None:
         """
         Cache data for endpoint and date.
 

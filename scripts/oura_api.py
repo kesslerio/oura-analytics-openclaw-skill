@@ -17,6 +17,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timedelta
 from pathlib import Path
+from email.utils import parsedate_to_datetime
 
 SKILL_DIR = Path(__file__).parent.parent
 
@@ -65,10 +66,22 @@ class OuraClient:
             except urllib.error.HTTPError as e:
                 if e.code == 429:
                     # Rate limited - respect Retry-After header
-                    retry_after = int(e.headers.get("Retry-After", 60))
+                    retry_after_raw = e.headers.get("Retry-After", "60")
+                    try:
+                        # Try parsing as integer (seconds)
+                        wait_time = int(retry_after_raw)
+                    except ValueError:
+                        # HTTP date format - parse and calculate delta
+                        try:
+                            retry_date = parsedate_to_datetime(retry_after_raw)
+                            wait_time = max(0, int((retry_date - datetime.now()).total_seconds()))
+                        except (ValueError, TypeError):
+                            # Fallback if parsing fails
+                            wait_time = 60
+                    
                     if attempt < max_retries - 1:
-                        print(f"Rate limited. Waiting {retry_after}s before retry {attempt + 1}/{max_retries}...", file=sys.stderr)
-                        time.sleep(retry_after)
+                        print(f"Rate limited. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}...", file=sys.stderr)
+                        time.sleep(wait_time)
                         continue
                 raise Exception(f"HTTP Error {e.code}: {e.reason}")
             except urllib.error.URLError as e:
@@ -124,7 +137,19 @@ class OuraClient:
             
             cached_data.extend(fresh_data)
 
-        return cached_data
+        # Deduplicate by ID (in case of overlapping date ranges)
+        seen_ids = set()
+        deduped = []
+        for item in cached_data:
+            item_id = item.get("id")
+            if item_id and item_id not in seen_ids:
+                seen_ids.add(item_id)
+                deduped.append(item)
+            elif not item_id:
+                # No ID field - keep item (shouldn't happen with Oura API)
+                deduped.append(item)
+        
+        return deduped
 
     def sync(self, endpoint, days=7):
         """
