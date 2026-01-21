@@ -230,7 +230,7 @@ def normalize_sleep(raw: Dict[str, Any]) -> SleepRecord:
         time_in_bed_hours=raw.get("time_in_bed", 0) / 3600,
         # Quality metrics
         efficiency_percent=raw.get("efficiency", 0),
-        latency_minutes=raw.get("latency") / 60 if raw.get("latency") else None,
+        latency_minutes=raw.get("latency") / 60 if raw.get("latency") is not None else None,
         # Physiological
         average_hrv_ms=raw.get("average_hrv"),
         average_heart_rate_bpm=raw.get("average_heart_rate"),
