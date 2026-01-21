@@ -543,12 +543,18 @@ def main():
 
             sleep = client.get_sleep(start_date_extended, end_date)
             sleep = sorted(sleep, key=lambda x: x.get('day'))
+            
+            readiness = client.get_readiness(start_date_extended, end_date)
+            readiness = sorted(readiness, key=lambda x: x.get('day'))
 
             current_sleep = sleep[-args.days:] if len(sleep) > 0 else []
             previous_sleep = sleep[:-args.days][-args.days:] if len(sleep) > args.days else []
+            
+            current_readiness = readiness[-args.days:] if len(readiness) > 0 else []
+            previous_readiness = readiness[:-args.days][-args.days:] if len(readiness) > args.days else []
 
-            analyzer_curr = OuraAnalyzer(current_sleep)
-            analyzer_prev = OuraAnalyzer(previous_sleep)
+            analyzer_curr = OuraAnalyzer(current_sleep, current_readiness)
+            analyzer_prev = OuraAnalyzer(previous_sleep, previous_readiness)
 
             summary_curr = analyzer_curr.summary()
             summary_prev = analyzer_prev.summary()
