@@ -246,9 +246,15 @@ python oura_api.py report --type weekly --format brief
 # Check for alerts (empty if OK)
 python oura_api.py summary --days 7 --format alert
 
-# Cron job (silent, exit code only)
+# Cron job (silent, exit code only - reflects script success, not health status)
 python oura_api.py summary --days 7 --format silent
 if [ $? -ne 0 ]; then
-  echo "Health check failed"
+  echo "Script execution failed"
+fi
+
+# For health-based cron alerts, use alert mode:
+ALERTS=$(python oura_api.py summary --days 7 --format alert)
+if [ -n "$ALERTS" ]; then
+  echo "$ALERTS"
 fi
 ```

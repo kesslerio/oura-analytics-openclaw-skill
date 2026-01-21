@@ -405,8 +405,17 @@ def format_output(data, mode: OutputMode = OutputMode.JSON):
                 if data.get("travel_days"):
                     lines.append(f"Travel: {', '.join(data['travel_days'])}")
                 return "\n".join(lines)
+            elif "avg_sleep_score" in data or "avg_sleep_hours" in data:
+                # Summary command output - prioritize key metrics
+                key_order = ["avg_sleep_score", "avg_readiness_score", "avg_sleep_hours", 
+                            "avg_sleep_efficiency", "avg_hrv", "days_tracked"]
+                lines = []
+                for key in key_order:
+                    if key in data:
+                        lines.append(f"{key}: {data[key]}")
+                return "\n".join(lines)
             else:
-                # Generic dict - show key metrics
+                # Generic dict - show first 6 items
                 lines = [f"{k}: {v}" for k, v in list(data.items())[:6]]
                 return "\n".join(lines)
         elif isinstance(data, list):
@@ -415,8 +424,11 @@ def format_output(data, mode: OutputMode = OutputMode.JSON):
     
     elif mode == OutputMode.ALERT:
         # Only output if something needs attention
-        if isinstance(data, dict) and "summary" in data:
-            s = data["summary"]
+        # Handle both nested report summary and flat summary command
+        s = data.get("summary", data) if isinstance(data, dict) else {}
+        
+        # Ensure we are looking at a summary-like object before checking thresholds
+        if isinstance(s, dict) and ("avg_sleep_score" in s or "avg_sleep_hours" in s):
             alerts = []
             
             # Check for concerning metrics
@@ -429,8 +441,7 @@ def format_output(data, mode: OutputMode = OutputMode.JSON):
             
             if alerts:
                 return "\n".join(alerts)
-            return ""  # No alerts
-        return ""
+        return ""  # No alerts or not a summary
     
     elif mode == OutputMode.SILENT:
         # No output - exit code only
