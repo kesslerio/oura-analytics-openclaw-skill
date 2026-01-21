@@ -73,6 +73,23 @@ class OuraCache:
 
         for f in files:
             f.unlink()
+        
+        # Also reset sync state
+        sync_state_file = self.cache_dir / "sync_state.json"
+        if sync_state_file.exists():
+            try:
+                sync_state = json.loads(sync_state_file.read_text())
+                if endpoint:
+                    # Clear specific endpoint
+                    sync_state.pop(endpoint, None)
+                else:
+                    # Clear all
+                    sync_state = {}
+                sync_state_file.write_text(json.dumps(sync_state, indent=2))
+            except (json.JSONDecodeError, IOError):
+                # If sync_state is corrupted, just delete it
+                if not endpoint:
+                    sync_state_file.unlink()
 
         return len(files)
 

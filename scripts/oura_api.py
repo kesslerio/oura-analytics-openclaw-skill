@@ -30,12 +30,19 @@ class OutputMode(Enum):
     ALERT = "alert"      # Only if something needs attention
     SILENT = "silent"    # Exit code only (for cron)
 
-# Import cache if available
+# Import cache if available (robust path handling)
 try:
-    from cache import OuraCache
+    # Try relative import first
+    from .cache import OuraCache
     CACHE_AVAILABLE = True
-except ImportError:
-    CACHE_AVAILABLE = False
+except (ImportError, ValueError):
+    # Fallback: add scripts dir to path
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from cache import OuraCache
+        CACHE_AVAILABLE = True
+    except ImportError:
+        CACHE_AVAILABLE = False
 
 class OuraClient:
     """Oura Cloud API client"""
@@ -176,6 +183,18 @@ class OuraClient:
 
         # Get last sync date
         last_sync = self.cache.get_last_sync(endpoint)
+        
+        if last_sync:
+            # Validate: reject future dates (corrupted state)
+            today = datetime.now().date()
+            try:
+                last_sync_date = datetime.strptime(last_sync, "%Y-%m-%d").date()
+                if last_sync_date > today:
+                    print(f"Warning: last_sync in future ({last_sync}), resetting", file=sys.stderr)
+                    last_sync = None
+            except ValueError:
+                print(f"Warning: invalid last_sync ({last_sync}), resetting", file=sys.stderr)
+                last_sync = None
         
         if last_sync:
             # Sync from last sync date to today
