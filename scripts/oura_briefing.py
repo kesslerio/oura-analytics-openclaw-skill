@@ -27,8 +27,8 @@ from briefing import BriefingFormatter, Baseline, format_brief_briefing, format_
 
 
 def _seconds_to_hours(seconds):
-    """Convert seconds to hours."""
-    return round(seconds / 3600, 1) if seconds else None
+    """Convert seconds to hours. Returns None only if seconds is None."""
+    return round(seconds / 3600, 1) if seconds is not None else None
 
 
 def _calculate_sleep_score(day):
@@ -106,10 +106,11 @@ def _analyze_week(sleep_data, readiness_data=None):
             "hours": hours
         })
     
-    # Calculate averages
+    # Calculate averages (filter None values from durations)
     avg_sleep_score = round(sum(scores) / len(scores), 1) if scores else None
     avg_readiness = round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else None
-    avg_duration = round(sum(durations) / len(durations), 1) if durations else None
+    valid_durations = [d for d in durations if d is not None]
+    avg_duration = round(sum(valid_durations) / len(valid_durations), 1) if valid_durations else None
     
     # Get HRV from most recent record (with data)
     hrv = None
