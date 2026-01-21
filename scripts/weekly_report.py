@@ -193,7 +193,8 @@ def send_telegram(message, chat_id=None, bot_token=None):
         return False
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    data = json.dumps({"chat_id": int(chat_id), "text": message, "parse_mode": "Markdown"}).encode("utf-8")
+    # Keep chat_id as string to support both numeric IDs and @channel usernames
+    data = json.dumps({"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}).encode("utf-8")
 
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
 
