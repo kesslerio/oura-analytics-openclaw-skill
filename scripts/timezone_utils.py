@@ -8,7 +8,7 @@ Handles timezone-aware day alignment, travel detection, and DST handling.
 import os
 import pytz
 from datetime import datetime, date
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 
 def get_user_timezone() -> str:
@@ -16,7 +16,7 @@ def get_user_timezone() -> str:
     return os.environ.get("USER_TIMEZONE", "America/Los_Angeles")
 
 
-def get_canonical_day(utc_timestamp: str, user_tz: Optional[str] = None) -> Tuple[date, str]:
+def get_canonical_day(utc_timestamp: str, user_tz: Optional[str] = None) -> Tuple[Optional[date], Optional[datetime]]:
     """
     Convert a UTC timestamp to the user's canonical day.
 
@@ -25,10 +25,15 @@ def get_canonical_day(utc_timestamp: str, user_tz: Optional[str] = None) -> Tupl
         user_tz: User's timezone (default: from USER_TIMEZONE env or America/Los_Angeles)
 
     Returns:
-        Tuple of (date object, timezone-aware datetime)
+        Tuple of (date object or None, timezone-aware datetime or None)
+        Returns (None, None) for invalid/missing timestamps
     """
     if user_tz is None:
         user_tz = get_user_timezone()
+
+    # Handle empty or invalid timestamps
+    if not utc_timestamp or len(utc_timestamp) < 10:
+        return None, None
 
     try:
         # Parse the UTC timestamp
@@ -36,25 +41,33 @@ def get_canonical_day(utc_timestamp: str, user_tz: Optional[str] = None) -> Tupl
         ts_clean = utc_timestamp.replace("Z", "+00:00")
         utc_dt = datetime.fromisoformat(ts_clean)
 
+        # Handle naive timestamps by assuming UTC
+        if utc_dt.tzinfo is None:
+            utc_dt = pytz.UTC.localize(utc_dt)
+
         # Convert to user's timezone
         user_tz_obj = pytz.timezone(user_tz)
         local_dt = utc_dt.astimezone(user_tz_obj)
 
         return local_dt.date(), local_dt
-    except (ValueError, pytz.UnknownTimeZoneError) as e:
-        # Fallback: return the date from the timestamp as-is
-        fallback_date = datetime.fromisoformat(utc_timestamp[:10]).date()
-        return fallback_date, None
+    except (ValueError, pytz.UnknownTimeZoneError):
+        # Return None for any parsing errors
+        return None, None
 
 
-def get_canonical_day_from_date_str(date_str: str, user_tz: Optional[str] = None) -> date:
+def get_canonical_day_from_date_str(date_str: str, user_tz: Optional[str] = None) -> Optional[date]:
     """
     Get canonical day from a date string (YYYY-MM-DD).
 
     For dates, we assume the date is in the user's local timezone.
+    Returns None for invalid/empty dates.
     """
     if user_tz is None:
         user_tz = get_user_timezone()
+
+    # Handle empty or invalid date strings
+    if not date_str or len(date_str) < 10:
+        return None
 
     try:
         # Parse the date as midnight in user's timezone
@@ -63,11 +76,10 @@ def get_canonical_day_from_date_str(date_str: str, user_tz: Optional[str] = None
         local_dt = user_tz_obj.localize(dt)
         return local_dt.date()
     except (ValueError, pytz.UnknownTimeZoneError):
-        # Fallback: return parsed date directly
-        return datetime.strptime(date_str, "%Y-%m-%d").date()
+        return None
 
 
-def is_travel_day(sleep_records: list, threshold_hours: float = 3.0) -> list:
+def is_travel_day(sleep_records: list, threshold_hours: float = 3.0) -> List[date]:
     """
     Detect potential travel days based on bedtime shifts.
 
@@ -87,11 +99,15 @@ def is_travel_day(sleep_records: list, threshold_hours: float = 3.0) -> list:
     # Extract bedtimes in user's local hour
     bedtimes = []
     for record in sleep_records:
-        canonical_day, local_dt = get_canonical_day(record.get("bedtime_start", ""), user_tz)
+        bedtime_start = record.get("bedtime_start", "")
+        if not bedtime_start:
+            continue
+
+        canonical_day, local_dt = get_canonical_day(bedtime_start, user_tz)
         if local_dt:
             bedtimes.append((canonical_day, local_dt.hour + local_dt.minute / 60))
 
-    # Find large shifts (> threshold_hours from median)
+    # Need at least 3 records for meaningful travel detection
     if len(bedtimes) < 3:
         return []
 
@@ -99,8 +115,9 @@ def is_travel_day(sleep_records: list, threshold_hours: float = 3.0) -> list:
     median_hour = sorted(hours)[len(hours) // 2]
 
     for day, hour in bedtimes:
-        shift = abs(hour - median_hour)
-        if shift > threshold_hours or (24 - shift) > threshold_hours:
+        # Use min to handle the wraparound at midnight
+        shift = min(abs(hour - median_hour), 24 - abs(hour - median_hour))
+        if shift > threshold_hours:
             if day not in travel_days:
                 travel_days.append(day)
 
@@ -144,6 +161,7 @@ def group_by_canonical_day(data: list, timestamp_field: str = "day",
 
     Returns:
         Dict mapping date strings to lists of records
+        Skips records with missing/invalid timestamps
     """
     if user_tz is None:
         user_tz = get_user_timezone()
@@ -151,9 +169,18 @@ def group_by_canonical_day(data: list, timestamp_field: str = "day",
     grouped = {}
     for record in data:
         if timestamp_field == "day":
-            canonical = get_canonical_day_from_date_str(record.get("day", ""), user_tz)
+            record_date = record.get("day", "")
+            if not record_date:
+                continue
+            canonical = get_canonical_day_from_date_str(record_date, user_tz)
         else:
-            canonical, _ = get_canonical_day(record.get(timestamp_field, ""), user_tz)
+            record_ts = record.get(timestamp_field, "")
+            if not record_ts:
+                continue
+            canonical, _ = get_canonical_day(record_ts, user_tz)
+
+        if canonical is None:
+            continue
 
         date_str = canonical.isoformat()
         if date_str not in grouped:
@@ -174,7 +201,7 @@ def format_localized_datetime(utc_timestamp: str, fmt: str = "%Y-%m-%d %H:%M",
         user_tz: User's timezone
 
     Returns:
-        Formatted datetime string in local time
+        Formatted datetime string in local time, or original if invalid
     """
     _, local_dt = get_canonical_day(utc_timestamp, user_tz)
     if local_dt:
