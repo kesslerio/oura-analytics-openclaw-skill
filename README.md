@@ -45,7 +45,7 @@ echo 'OURA_API_TOKEN="your_token_here"' >> ~/.config/systemd/user/secrets.conf
 
 ```bash
 git clone https://github.com/kesslerio/oura-analytics-clawdbot-skill.git ~/.clawdbot/skills/oura-analytics
-pip install requests python-telegram-bot
+pip install python-telegram-bot
 ```
 
 ### 3. Add to Clawdbot's TOOLS.md
