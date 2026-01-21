@@ -23,7 +23,112 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from oura_api import OuraClient
 from schema import create_night_record
-from briefing import BriefingFormatter, Baseline, format_brief_briefing, format_json_briefing
+from briefing import BriefingFormatter, Baseline, format_brief_briefing, format_json_briefing, format_hybrid_briefing
+
+
+def _seconds_to_hours(seconds):
+    """Convert seconds to hours. Returns None only if seconds is None."""
+    return round(seconds / 3600, 1) if seconds is not None else None
+
+
+def _calculate_sleep_score(day):
+    """Calculate sleep score from day record. Guards against null efficiency."""
+    efficiency = day.get("efficiency") or 0  # Handle None/null values
+    duration_hours = _seconds_to_hours(day.get("total_sleep_duration", 0)) or 0
+    eff_score = min(efficiency, 100) if efficiency else 0
+    dur_score = min(duration_hours / 8 * 100, 100)
+    return round((eff_score * 0.6) + (dur_score * 0.4), 1)
+
+
+def _analyze_week(sleep_data, readiness_data=None):
+    """Analyze weekly data for hybrid briefing."""
+    if not sleep_data:
+        return None
+    
+    # Calculate sleep scores
+    scores = []
+    for d in sleep_data:
+        score = _calculate_sleep_score(d)
+        if score is None or score == 0:
+            duration_sec = d.get("total_sleep_duration", 0)
+            duration_hours = duration_sec / 3600 if duration_sec else 0
+            dur_score = min(duration_hours / 8 * 100, 100)
+            score = round(dur_score, 1)
+        scores.append(score)
+    
+    # Get efficiency (handle None/null values)
+    efficiencies = [d.get("efficiency") or 0 for d in sleep_data]
+    avg_efficiency = round(sum(efficiencies) / len(efficiencies), 1) if efficiencies else None
+    
+    # Get durations
+    durations = [_seconds_to_hours(d.get("total_sleep_duration", 0)) for d in sleep_data]
+    
+    # Build readiness lookup by day
+    readiness_by_day = {}
+    if readiness_data:
+        readiness_by_day = {r.get("day"): r for r in readiness_data}
+    
+    readiness_scores = []
+    for d in sleep_data:
+        day = d.get("day")
+        if day in readiness_by_day:
+            r = readiness_by_day[day].get("score")
+            if r:
+                readiness_scores.append(r)
+    
+    # Calculate trends (first half vs second half)
+    sleep_trend = 0
+    if len(scores) >= 2:
+        half = len(scores) // 2
+        if half >= 1:
+            first_half_avg = sum(scores[:half]) / half
+            second_half_avg = sum(scores[half:]) / (len(scores) - half)
+            sleep_trend = round(second_half_avg - first_half_avg, 1)
+    
+    readiness_trend = 0
+    if len(readiness_scores) >= 2:
+        half = len(readiness_scores) // 2
+        first_half_avg = sum(readiness_scores[:half]) / half
+        second_half_avg = sum(readiness_scores[half:]) / (len(readiness_scores) - half)
+        readiness_trend = round(second_half_avg - first_half_avg, 1)
+    
+    # Get last 2 days data
+    last_2_days = []
+    for i, d in enumerate(sleep_data[-2:]):
+        day = d.get("day")
+        score = scores[-(2-i)] if len(scores) >= 2-i else scores[0]
+        hours = _seconds_to_hours(d.get("total_sleep_duration", 0))
+        r_score = readiness_by_day.get(day, {}).get("score") if day in readiness_by_day else None
+        last_2_days.append({
+            "day": day,
+            "sleep_score": score,
+            "readiness": r_score,
+            "hours": hours
+        })
+    
+    # Calculate averages (filter None values from durations)
+    avg_sleep_score = round(sum(scores) / len(scores), 1) if scores else None
+    avg_readiness = round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else None
+    valid_durations = [d for d in durations if d is not None]
+    avg_duration = round(sum(valid_durations) / len(valid_durations), 1) if valid_durations else None
+    
+    # Get HRV from most recent record (with data)
+    hrv = None
+    for d in reversed(sleep_data):
+        if d.get("average_hrv"):
+            hrv = d.get("average_hrv")
+            break
+    
+    return {
+        "avg_sleep_score": avg_sleep_score,
+        "avg_readiness": avg_readiness,
+        "avg_efficiency": avg_efficiency,
+        "avg_duration": avg_duration,
+        "avg_hrv": hrv,
+        "sleep_trend": sleep_trend,
+        "readiness_trend": readiness_trend,
+        "last_2_days": last_2_days
+    }
 
 
 def main():
@@ -31,8 +136,8 @@ def main():
     parser.add_argument("--date", help="Date for briefing (YYYY-MM-DD, default: today)")
     parser.add_argument("--token", help="Oura API token")
     parser.add_argument("--verbose", action="store_true", help="Detailed briefing with driver analysis")
-    parser.add_argument("--format", choices=["text", "brief", "json"], default="text",
-                       help="Output format (text=full briefing, brief=3 lines, json=structured)")
+    parser.add_argument("--format", choices=["text", "brief", "json", "hybrid"], default="text",
+                       help="Output format (text=full briefing, brief=3 lines, json=structured, hybrid=briefing+trends)")
     parser.add_argument("--baseline-days", type=int, default=14,
                        help="Days to use for baseline calculation (default: 14)")
     
@@ -90,12 +195,23 @@ def main():
         
         baseline = Baseline.from_history(baseline_nights) if baseline_nights else None
         
+        # Fetch week data for hybrid format (7-day window: target_date - 6 through target_date)
+        week_data = None
+        if args.format == "hybrid":
+            week_start = (datetime.strptime(target_date, "%Y-%m-%d") - timedelta(days=6)).strftime("%Y-%m-%d")
+            week_sleep = client.get_sleep(week_start, target_date)
+            week_readiness = client.get_readiness(week_start, target_date)
+            week_data = _analyze_week(week_sleep, week_readiness)
+        
         # Format output
         if args.format == "json":
             output = format_json_briefing(night, baseline)
             print(json.dumps(output, indent=2))
         elif args.format == "brief":
             output = format_brief_briefing(night, baseline)
+            print(output)
+        elif args.format == "hybrid":
+            output = format_hybrid_briefing(night, baseline, week_data)
             print(output)
         else:  # text
             formatter = BriefingFormatter(baseline)
