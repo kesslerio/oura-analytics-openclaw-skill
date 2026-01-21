@@ -12,57 +12,60 @@ import os
 import sys
 import json
 import argparse
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 from pathlib import Path
-
-try:
-    import requests
-except ImportError:
-    print("Install requests: pip install requests")
-    sys.exit(1)
 
 SKILL_DIR = Path(__file__).parent.parent
 
 class OuraClient:
     """Oura Cloud API client"""
-    
+
     BASE_URL = "https://api.ouraring.com/v2/usercollection"
-    
+
     def __init__(self, token=None):
         self.token = token or os.environ.get("OURA_API_TOKEN")
         if not self.token:
             raise ValueError("OURA_API_TOKEN not set. Get it at https://cloud.ouraring.com/personal-access-token")
         self.headers = {"Authorization": f"Bearer {self.token}"}
-    
+
     def _request(self, endpoint, start_date=None, end_date=None):
-        """Make API request"""
+        """Make API request using urllib"""
         url = f"{self.BASE_URL}/{endpoint}"
-        params = {}
+        params = []
         if start_date:
-            params["start_date"] = start_date
+            params.append(f"start_date={start_date}")
         if end_date:
-            params["end_date"] = end_date
-        
-        resp = requests.get(url, headers=self.headers, params=params, timeout=10)
-        resp.raise_for_status()
-        return resp.json().get("data", [])
-    
+            params.append(f"end_date={end_date}")
+
+        if params:
+            url += "?" + "&".join(params)
+
+        req = urllib.request.Request(url, headers=self.headers)
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data.get("data", [])
+        except urllib.error.HTTPError as e:
+            raise Exception(f"HTTP Error {e.code}: {e.reason}")
+
     def get_sleep(self, start_date=None, end_date=None):
         """Fetch sleep data (summary)"""
         return self._request("sleep", start_date, end_date)
-    
+
     def get_daily_sleep(self, start_date=None, end_date=None):
         """Fetch detailed sleep data"""
         return self._request("daily_sleep", start_date, end_date)
-    
+
     def get_readiness(self, start_date=None, end_date=None):
         """Fetch readiness data"""
         return self._request("daily_readiness", start_date, end_date)
-    
+
     def get_activity(self, start_date=None, end_date=None):
         """Fetch activity data"""
         return self._request("daily_activity", start_date, end_date)
-    
+
     def get_hrv(self, start_date=None, end_date=None):
         """Fetch HRV data"""
         return self._request("hrv", start_date, end_date)
@@ -78,24 +81,16 @@ class OuraClient:
         start_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%d")
 
         # Get daily sleep scores
-        resp_daily = requests.get(
-            f"{self.BASE_URL}/daily_sleep",
-            headers=self.headers,
-            params={"start_date": start_date, "end_date": end_date},
-            timeout=10
-        )
-        resp_daily.raise_for_status()
-        daily_data = {item["day"]: item for item in resp_daily.json().get("data", [])}
+        url_daily = f"{self.BASE_URL}/daily_sleep?start_date={start_date}&end_date={end_date}"
+        req_daily = urllib.request.Request(url_daily, headers=self.headers)
+        with urllib.request.urlopen(req_daily, timeout=10) as resp_daily:
+            daily_data = {item["day"]: item for item in json.loads(resp_daily.read().decode("utf-8")).get("data", [])}
 
         # Get detailed sleep data
-        resp_sleep = requests.get(
-            f"{self.BASE_URL}/sleep",
-            headers=self.headers,
-            params={"start_date": start_date, "end_date": end_date},
-            timeout=10
-        )
-        resp_sleep.raise_for_status()
-        sleep_data = resp_sleep.json().get("data", [])
+        url_sleep = f"{self.BASE_URL}/sleep?start_date={start_date}&end_date={end_date}"
+        req_sleep = urllib.request.Request(url_sleep, headers=self.headers)
+        with urllib.request.urlopen(req_sleep, timeout=10) as resp_sleep:
+            sleep_data = json.loads(resp_sleep.read().decode("utf-8")).get("data", [])
 
         # Merge: add scores to sleep data
         for item in sleep_data:
@@ -115,30 +110,30 @@ class OuraClient:
 
 class OuraAnalyzer:
     """Analyze Oura data"""
-    
+
     def __init__(self, sleep_data=None, readiness_data=None, activity_data=None):
         self.sleep = sleep_data or []
         self.readiness = readiness_data or []
         self.activity = activity_data or []
-    
+
     @staticmethod
     def seconds_to_hours(seconds):
         """Convert seconds to hours"""
         return round(seconds / 3600, 1) if seconds else None
-    
+
     @staticmethod
     def calculate_sleep_score(day):
         """Calculate approximate sleep score from available metrics"""
         efficiency = day.get("efficiency", 0)
         duration_sec = day.get("total_sleep_duration", 0)
         duration_hours = duration_sec / 3600 if duration_sec else 0
-        
+
         # Oura's algorithm approximation:
         eff_score = min(efficiency, 100)
         dur_score = min(duration_hours / 8 * 100, 100)  # 8 hours = 100%
-        
+
         return round((eff_score * 0.6) + (dur_score * 0.4), 1)
-    
+
     def average_metric(self, data, metric, convert_to_hours=False):
         """Calculate average of a metric"""
         if not data:
@@ -151,7 +146,7 @@ class OuraAnalyzer:
                     val = self.seconds_to_hours(val)
                 values.append(val)
         return round(sum(values) / len(values), 2) if values else None
-    
+
     def trend(self, data, metric, days=7):
         """Calculate trend over N days"""
         if len(data) < 2:
@@ -162,20 +157,20 @@ class OuraAnalyzer:
         first = recent[0].get(metric, 0)
         last = recent[-1].get(metric, 0)
         return round(last - first, 2)
-    
+
     def summary(self):
         """Generate summary"""
         avg_sleep_hours = self.average_metric(self.sleep, "total_sleep_duration", convert_to_hours=True)
         avg_efficiency = self.average_metric(self.sleep, "efficiency")
         avg_hrv = self.average_metric(self.sleep, "average_hrv")
-        
+
         # Calculate average sleep score
         sleep_scores = [self.calculate_sleep_score(d) for d in self.sleep]
         avg_sleep_score = round(sum(sleep_scores) / len(sleep_scores), 1) if sleep_scores else None
-        
+
         # Readiness from dedicated dataset (not nested in sleep)
         avg_readiness = self.average_metric(self.readiness, "score")
-        
+
         return {
             "avg_sleep_score": avg_sleep_score,
             "avg_readiness_score": avg_readiness,
@@ -188,25 +183,25 @@ class OuraAnalyzer:
 
 class OuraReporter:
     """Generate Oura reports"""
-    
+
     def __init__(self, client):
         self.client = client
-    
+
     def generate_report(self, report_type="weekly", days=None):
         """Generate report"""
         if not days:
             days = 7 if report_type == "weekly" else 30
-        
+
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        
+
         sleep = self.client.get_sleep(start_date, end_date)
         readiness = self.client.get_readiness(start_date, end_date)
         activity = self.client.get_activity(start_date, end_date)
-        
+
         analyzer = OuraAnalyzer(sleep, readiness, activity)
         summary = analyzer.summary()
-        
+
         return {
             "report_type": report_type,
             "period": f"{start_date} to {end_date}",
@@ -226,31 +221,31 @@ def main():
     parser.add_argument("--days", type=int, default=7, help="Number of days")
     parser.add_argument("--type", default="weekly", help="Report type")
     parser.add_argument("--token", help="Oura API token")
-    
+
     args = parser.parse_args()
-    
+
     try:
         client = OuraClient(args.token)
-        
+
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=args.days)).strftime("%Y-%m-%d")
-        
+
         if args.command == "sleep":
             data = client.get_sleep(start_date, end_date)
             print(json.dumps(data, indent=2))
-            
+
         elif args.command == "daily_sleep":
             data = client.get_daily_sleep(start_date, end_date)
             print(json.dumps(data, indent=2))
-        
+
         elif args.command == "readiness":
             data = client.get_readiness(start_date, end_date)
             print(json.dumps(data, indent=2))
-        
+
         elif args.command == "activity":
             data = client.get_activity(start_date, end_date)
             print(json.dumps(data, indent=2))
-        
+
         elif args.command == "summary":
             sleep = client.get_sleep(start_date, end_date)
             # readiness = client.get_readiness(start_date, end_date) # Unused in analyzer currently if passing only sleep
@@ -262,22 +257,22 @@ def main():
             # Fetch 2x days
             doubled_days = args.days * 2
             start_date_extended = (datetime.now() - timedelta(days=doubled_days)).strftime("%Y-%m-%d")
-            
+
             sleep = client.get_sleep(start_date_extended, end_date)
-            
+
             # Sort by date
             sleep = sorted(sleep, key=lambda x: x.get('day'))
-            
+
             # Split into Current (last N days) and Previous (N days before that)
             current_sleep = sleep[-args.days:] if len(sleep) > 0 else []
             previous_sleep = sleep[:-args.days][-args.days:] if len(sleep) > args.days else []
-            
+
             analyzer_curr = OuraAnalyzer(current_sleep)
             analyzer_prev = OuraAnalyzer(previous_sleep)
-            
+
             summary_curr = analyzer_curr.summary()
             summary_prev = analyzer_prev.summary()
-            
+
             diff = {}
             for key in summary_curr:
                 curr_val = summary_curr.get(key)
@@ -286,18 +281,18 @@ def main():
                     diff[key] = round(curr_val - prev_val, 2)
                 else:
                     diff[key] = None
-            
+
             print(json.dumps({
                 "current": summary_curr,
                 "previous": summary_prev,
                 "diff": diff
             }, indent=2))
-        
+
         elif args.command == "report":
             reporter = OuraReporter(client)
             report = reporter.generate_report(args.type, args.days)
             print(json.dumps(report, indent=2))
-    
+
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         print("Set OURA_API_TOKEN environment variable or use --token", file=sys.stderr)
