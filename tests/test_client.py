@@ -18,8 +18,8 @@ def make_mock_response(data, status=200):
     mock_resp = MagicMock()
     mock_resp.status = status
     mock_resp.read.return_value = json.dumps({"data": data}).encode("utf-8")
-    mock_resp.__enter__ = lambda self: self
-    mock_resp.__exit__ = lambda self, *args: None
+    # Fix context manager protocol: __enter__ must return the mock itself
+    mock_resp.__enter__.return_value = mock_resp
     return mock_resp
 
 
