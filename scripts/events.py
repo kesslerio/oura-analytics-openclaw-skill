@@ -103,7 +103,8 @@ class CorrelationAnalyzer:
         self,
         events: List[Dict],
         metric: str = "readiness",
-        lag_days: int = 1
+        lag_days: int = 1,
+        tag: Optional[str] = None
     ) -> Dict:
         """
         Analyze correlation between event tag and outcome metric.
@@ -112,12 +113,16 @@ class CorrelationAnalyzer:
             events: List of event dicts with same tag
             metric: Metric to correlate ("readiness" | "sleep_score" | "hrv")
             lag_days: Days to look ahead for outcome (default: 1 = next-day effect)
+            tag: The tag being analyzed (for accurate reporting)
         
         Returns:
             Analysis dict with mean difference and significance
         """
         if not events:
             return {"error": "No events provided"}
+        
+        # Use provided tag or fall back to first tag in first event
+        analyzed_tag = tag or (events[0]["tags"][0] if events[0].get("tags") else "unknown")
         
         # Extract dates
         event_dates = [e["date"] for e in events]
@@ -214,7 +219,7 @@ class CorrelationAnalyzer:
         
         return {
             "metric": metric,
-            "tag": events[0]["tags"][0] if events[0].get("tags") else "unknown",
+            "tag": analyzed_tag,
             "event_mean": round(event_mean, 1),
             "control_mean": round(control_mean, 1),
             "difference": round(diff, 1),
@@ -297,7 +302,7 @@ def main():
         client = OuraClient(args.token)
         analyzer = CorrelationAnalyzer(client)
         
-        result = analyzer.analyze_tag_correlation(events, args.metric, args.lag)
+        result = analyzer.analyze_tag_correlation(events, args.metric, args.lag, args.tag)
         
         if "error" in result:
             print(f"Error: {result['error']}")

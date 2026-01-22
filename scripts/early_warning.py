@@ -115,11 +115,16 @@ class EarlyWarningSystem:
     
     def check_temperature(self, temp_history: List[float]) -> Tuple[Signal, bool]:
         """Check for temperature elevation."""
-        if not temp_history:
+        if not temp_history or len(temp_history) < 3:
             return Signal("Temperature", 0, 0, 0, False, "low"), False
         
         current = temp_history[-1]
         baseline = self.calculate_rolling_baseline(temp_history[:-1])
+        
+        # Skip if insufficient baseline data
+        if baseline == 0.0:
+            return Signal("Temperature deviation", current, 0, 0, False, "low"), False
+        
         delta = current - baseline
         
         # Check threshold
@@ -166,11 +171,16 @@ class EarlyWarningSystem:
     
     def check_rhr(self, rhr_history: List[float]) -> Tuple[Signal, bool]:
         """Check for RHR elevation."""
-        if not rhr_history or len(rhr_history) < 2:
+        if not rhr_history or len(rhr_history) < 3:
             return Signal("RHR", 0, 0, 0, False, "low"), False
         
         current = rhr_history[-1]
         baseline = self.calculate_rolling_baseline(rhr_history[:-1], window=7)
+        
+        # Skip if insufficient baseline data
+        if baseline == 0.0:
+            return Signal("Resting HR", current, 0, 0, False, "low"), False
+        
         delta = current - baseline
         
         # Check threshold

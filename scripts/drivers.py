@@ -95,8 +95,11 @@ class DriverAnalyzer:
             severity = self._classify_severity(abs(delta), thresholds=[0.3, 0.5])
             drivers.append(Driver("REM Sleep", rem_sleep_hours, baseline, delta, impact, severity))
         
-        # Sort by severity and impact (negatives first)
-        drivers.sort(key=lambda d: (d.impact != "negative", d.severity != "high", abs(d.delta)), reverse=True)
+        # Sort by severity and impact (negatives first, high severity first)
+        # Lower sort values come first, so negative=0, positive=1; high=0, medium=1, low=2
+        severity_order = {"high": 0, "medium": 1, "low": 2}
+        impact_order = {"negative": 0, "neutral": 1, "positive": 2}
+        drivers.sort(key=lambda d: (impact_order.get(d.impact, 1), severity_order.get(d.severity, 1), -abs(d.delta)))
         return drivers
     
     def analyze_readiness_drivers(self, sleep_data: Dict, readiness_data: Dict) -> List[Driver]:
@@ -149,8 +152,10 @@ class DriverAnalyzer:
             severity = self._classify_severity(abs(delta), thresholds=[0.2, 0.4])
             drivers.append(Driver("Temperature", temp_dev, baseline, delta, impact, severity))
         
-        # Sort by severity and impact
-        drivers.sort(key=lambda d: (d.impact != "negative", d.severity != "high", abs(d.delta)), reverse=True)
+        # Sort by severity and impact (negatives first, high severity first)
+        severity_order = {"high": 0, "medium": 1, "low": 2}
+        impact_order = {"negative": 0, "neutral": 1, "positive": 2}
+        drivers.sort(key=lambda d: (impact_order.get(d.impact, 1), severity_order.get(d.severity, 1), -abs(d.delta)))
         return drivers
     
     def generate_suggestion(self, readiness_score: float, drivers: List[Driver]) -> str:
