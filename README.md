@@ -1,7 +1,7 @@
 # Oura Analytics - Clawdbot Skill
 
 [![Clawdbot Community Skill](https://img.shields.io/badge/clawdbot-community%20skill-blue)](https://github.com/clawdbot/clawdbot)
-[![ClawdHub Listing Pending](https://img.shields.io/badge/clawdhub-listing%20pending-lightgrey)](https://clawdhub.com)
+[![ClawdHub Listed](https://img.shields.io/badge/clawdhub-listed-green)](https://clawdhub.com/skills/oura-analytics)
 
 **Production-grade Oura Ring data integration for Clawdbot**  
 Fetch sleep scores, readiness, activity, HRV, and trends from Oura Cloud API. Generate automated health reports and trigger-based alerts.
