@@ -90,6 +90,48 @@ python scripts/weekly_report.py --days 30
 python scripts/alerts.py --days 7 --readiness 60 --efficiency 80 --telegram
 ```
 
+### Baseline & Comparison Analysis
+
+```bash
+# Compare last 7 days vs 30-day baseline
+python scripts/baseline.py --current-days 7 --baseline-days 30
+
+# View 90-day baseline statistics
+python scripts/baseline.py --baseline-only --baseline-days 90
+
+# JSON output for programmatic use
+python scripts/baseline.py --json
+```
+
+**Example output:**
+```
+📈 Current vs Baseline (Last 7d vs 30d baseline)
+
+   ↗️ Sleep Score: 89.5 (+10.6, z=0.53)
+      Above baseline
+
+   ➡️ Readiness: 77.1 (+1.0, z=0.15)
+      Within baseline
+
+   ↗️ Sleep Duration: 7.3 (+1.4, z=0.52)
+      Above baseline
+
+   ↗️ Efficiency: 89.7 (+6.8, z=0.52)
+      Above baseline
+
+✅ All metrics within or above baseline range
+```
+
+**Interpretation:**
+- **z-score**: Standard deviations from baseline mean
+  - `z > 1.5`: 🔥 Well above baseline
+  - `0.5 < z < 1.5`: ↗️ Above baseline
+  - `-0.5 < z < 0.5`: ➡️ Within baseline
+  - `-1.5 < z < -0.5`: ↘️ Below baseline
+  - `z < -1.5`: ⚠️ Well below baseline (needs attention)
+- **Baseline range**: P25-P75 (middle 50% of your historical data)
+- **Sample size**: Number of days used to calculate baseline
+
 ## Core Workflows
 
 ### 1. Morning Health Check
