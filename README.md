@@ -60,6 +60,12 @@ pip install -r requirements.txt
 
 ## Usage Examples
 
+> Note: For Python imports, set `PYTHONPATH` to the `scripts/` folder:
+>
+> ```bash
+> export PYTHONPATH="$(pwd)/scripts"
+> ```
+
 ### Fetch Sleep Data
 
 ```bash
@@ -283,7 +289,7 @@ All data is stored locally in `~/.oura-analytics/`:
 
 ```
 ~/.oura-analytics/
-├── cache/                  # Cached API responses (90 days default)
+├── cache/                  # Cached API responses (cleanup is manual)
 │   ├── sleep/             # Sleep records by date (YYYY-MM-DD.json)
 │   ├── daily_readiness/   # Readiness records
 │   └── daily_activity/    # Activity records

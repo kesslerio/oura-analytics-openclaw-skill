@@ -34,10 +34,10 @@ class EventLogger:
         Initialize event logger.
         
         Args:
-            data_dir: Directory for events.jsonl (default: ~/.oura-analytics/data/)
+            data_dir: Directory for events.jsonl (default: ~/.oura-analytics/)
         """
         if data_dir is None:
-            data_dir = Path.home() / ".oura-analytics" / "data"
+            data_dir = Path.home() / ".oura-analytics"
         
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)

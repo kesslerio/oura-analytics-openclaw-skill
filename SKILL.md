@@ -34,31 +34,51 @@ Use this skill when:
 ## Core Workflows
 
 ### 1. Data Fetching
-```python
+```bash
+export PYTHONPATH="{baseDir}/scripts"
+python - <<'PY'
 from oura_api import OuraClient
 
-client = OuraClient(token=oura_api_token)
+client = OuraClient(token="YOUR_TOKEN")
 sleep_data = client.get_sleep(start_date="2026-01-01", end_date="2026-01-16")
 readiness_data = client.get_readiness(start_date="2026-01-01", end_date="2026-01-16")
+print(len(sleep_data), len(readiness_data))
+PY
 ```
 
 ### 2. Trend Analysis
-```python
-from oura_api import OuraAnalyzer
+```bash
+export PYTHONPATH="{baseDir}/scripts"
+python - <<'PY'
+from oura_api import OuraClient, OuraAnalyzer
+
+client = OuraClient(token="YOUR_TOKEN")
+sleep_data = client.get_sleep(start_date="2026-01-01", end_date="2026-01-16")
+readiness_data = client.get_readiness(start_date="2026-01-01", end_date="2026-01-16")
 
 analyzer = OuraAnalyzer(sleep_data, readiness_data)
-avg_sleep = analyzer.average_metric("sleep_score")
-avg_readiness = analyzer.average_metric("readiness_score")
-trend = analyzer.trend("hrv_balance")
+avg_sleep = analyzer.average_metric(sleep_data, "score")
+avg_readiness = analyzer.average_metric(readiness_data, "score")
+trend = analyzer.trend(sleep_data, "average_hrv")
+print(avg_sleep, avg_readiness, trend)
+PY
 ```
 
 ### 3. Alerts
-```python
-from alerts import OuraAlerts
-
-alerts = OuraAlerts(thresholds={"readiness": 60, "sleep_score": 70})
-low_days = alerts.find_low_days(readiness_data)
+```bash
+python {baseDir}/scripts/alerts.py --days 7 --readiness 60 --efficiency 80
 ```
+
+## Environment
+
+Required:
+- `OURA_API_TOKEN`
+
+Optional (used for alerts/reports/timezone/output):
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `USER_TIMEZONE`
+- `OURA_OUTPUT_DIR`
 
 ## Scripts
 
