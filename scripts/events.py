@@ -16,6 +16,7 @@ import argparse
 import sys
 import json
 import statistics
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
@@ -37,7 +38,16 @@ class EventLogger:
             data_dir: Directory for events.jsonl (default: ~/.oura-analytics/)
         """
         if data_dir is None:
-            data_dir = Path.home() / ".oura-analytics"
+            base_dir = Path.home() / ".oura-analytics"
+            legacy_dir = base_dir / "data"
+            legacy_file = legacy_dir / "events.jsonl"
+            default_file = base_dir / "events.jsonl"
+
+            if legacy_file.exists() and not default_file.exists():
+                base_dir.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(legacy_file), str(default_file))
+
+            data_dir = base_dir
         
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
