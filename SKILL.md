@@ -1,7 +1,7 @@
 ---
 name: oura-analytics
 description: Oura Ring data integration and analytics. Fetch sleep scores, readiness, activity, HRV, and trends from the Oura Cloud API. Generate automated reports, correlations with productivity, and trigger-based alerts for low recovery days. Requires OURA_API_TOKEN (get at cloud.ouraring.com).
-metadata: {"clawdbot":{"requires":{"bins":["python3"],"env":["OURA_API_TOKEN"]},"homepage":"https://cloud.ouraring.com"}}
+metadata: {"clawdbot":{"requires":{"bins":["python3"],"env":["OURA_API_TOKEN"]},"homepage":"https://github.com/kesslerio/oura-analytics-clawdbot-skill"}}
 ---
 
 # Oura Analytics
