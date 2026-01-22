@@ -347,7 +347,8 @@ def format_hybrid_briefing(
     lines = []
     
     # === SECTION 1: Morning Briefing ===
-    lines.append(f"☀️  Morning Briefing ({_format_date(night.date)})")
+    lines.append(f"🌅 *Morning Briefing — {_format_date(night.date)}*")
+    lines.append("─" * 24)
     
     # Sleep line with delta
     if night.sleep:
@@ -361,8 +362,8 @@ def format_hybrid_briefing(
             delta_str = f"↑{delta_min}min vs avg"
         else:
             delta_str = f"↓{abs(delta_min)}min vs avg"
-        sleep_indicator = "✓" if abs(delta_min) < 60 else "○"
-        lines.append(f"Sleep: {h}h {m}m ({delta_str}) {sleep_indicator}")
+        sleep_indicator = "✅" if abs(delta_min) < 60 else "⚠️"
+        lines.append(f"💤 *Sleep*: {h}h {m}m ({delta_str}) {sleep_indicator}")
     
     # Readiness line with delta
     if night.readiness:
@@ -374,25 +375,26 @@ def format_hybrid_briefing(
             delta_str = f"↑{int(delta)} vs baseline"
         else:
             delta_str = f"↓{abs(int(delta))} vs baseline"
-        ready_indicator = "✓" if score >= 70 else "○"
-        lines.append(f"Readiness: {score} ({delta_str}) {ready_indicator}")
+        ready_indicator = "✅" if score >= 70 else "⚠️"
+        lines.append(f"⚡ *Readiness*: {score} ({delta_str}) {ready_indicator}")
         
         # Driver analysis (compact)
         drivers = _get_low_contributors(night.readiness)
         if drivers:
-            lines.append(f"└─ Driven by: {', '.join(drivers[:2])}")
+            lines.append(f"*Drivers*: {', '.join(drivers[:2])}")
         else:
-            lines.append("└─ All contributors balanced")
+            lines.append("*Drivers*: All balanced")
     
     # Recovery status + recommendation
     status, recommendation = formatter._get_status_and_recommendation(night)
-    lines.append(f"Recovery Status: {status}")
-    lines.append(f"Recommendation: {recommendation}")
+    lines.append(f"*Recovery*: {status}")
+    lines.append(f"*Rec*: {recommendation}")
     
     # === SECTION 2: Trend Snapshot ===
     if week_data:
         lines.append("")
-        lines.append("— Trend Snapshot (7-day avg)")
+        lines.append(f"*📊 7-Day Trends*")
+        lines.append("─" * 24)
         
         # 7-day averages with delta arrows
         avg_sleep = week_data.get("avg_sleep_score")
@@ -405,25 +407,24 @@ def format_hybrid_briefing(
         sleep_trend = week_data.get("sleep_trend", 0)
         if avg_sleep:
             trend_arrow = _trend_arrow(sleep_trend)
-            lines.append(f"Sleep Score: {avg_sleep} {trend_arrow}")
+            lines.append(f"*Sleep Score*: `{avg_sleep:>2}` {trend_arrow}")
         
         # Readiness with trend
         readiness_trend = week_data.get("readiness_trend", 0)
         if avg_readiness:
             trend_arrow = _trend_arrow(readiness_trend)
-            lines.append(f"Readiness: {avg_readiness} {trend_arrow}")
+            lines.append(f"*Readiness*: `{avg_readiness:>2}` {trend_arrow}")
         
-        # Avg sleep duration
+        # Key metrics row
+        metrics = []
         if avg_duration:
-            lines.append(f"Avg Sleep: {avg_duration}h")
-        
-        # Efficiency
+            metrics.append(f"*{avg_duration}h* sleep")
         if avg_efficiency:
-            lines.append(f"Efficiency: {avg_efficiency}%")
-        
-        # HRV
+            metrics.append(f"*{avg_efficiency}%* eff")
         if avg_hrv:
-            lines.append(f"HRV: {avg_hrv}ms")
+            metrics.append(f"*{avg_hrv}ms* HRV")
+        if metrics:
+            lines.append(f"• {' • '.join(metrics)}")
         
         # Last 2 nights
         last_2_days = week_data.get("last_2_days", [])
@@ -435,11 +436,10 @@ def format_hybrid_briefing(
             d2_sleep = d2.get("sleep_score", "N/A")
             d2_ready = d2.get("readiness", "N/A")
             
-            # Format: "Recent Sleep: YYYY-MM-DD: 81, YYYY-MM-DD: 93"
             d1_date = d1.get("day", "")[-5:]  # MM-DD
             d2_date = d2.get("day", "")[-5:]
-            lines.append(f"Recent Sleep: {d1_date}: {d1_sleep}, {d2_date}: {d2_sleep}")
-            lines.append(f"Recent Readiness: {d1_date}: {d1_ready}, {d2_date}: {d2_ready}")
+            lines.append("")
+            lines.append(f"*Recent*: {d1_date} → `{d1_sleep}`/`{d1_ready}` • {d2_date} → `{d2_sleep}`/`{d2_ready}`")
     
     return "\n".join(lines)
 

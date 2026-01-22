@@ -12,13 +12,13 @@ description: Oura Ring data integration and analytics. Fetch sleep scores, readi
 export OURA_API_TOKEN="your_personal_access_token"
 
 # Fetch sleep data (last 7 days)
-python /home/art/.clawdbot/skills/oura-analytics/scripts/oura_api.py sleep --days 7
+python scripts/oura_api.py sleep --days 7
 
 # Get readiness summary
-python /home/art/.clawdbot/skills/oura-analytics/scripts/oura_api.py readiness --days 7
+python scripts/oura_api.py readiness --days 7
 
 # Generate weekly report
-python /home/art/.clawdbot/skills/oura-analytics/scripts/oura_api.py report --type weekly
+python scripts/oura_api.py report --type weekly
 ```
 
 ## When to Use
@@ -70,3 +70,48 @@ low_days = alerts.find_low_days(readiness_data)
 
 - `references/api.md` - Oura Cloud API documentation
 - `references/metrics.md` - Metric definitions and interpretations
+
+## Automation (Cron Jobs)
+
+Cron jobs are configured in Clawdbot's gateway, not in this repo. Add these to your Clawdbot setup:
+
+### Daily Morning Briefing (8:00 AM)
+```bash
+clawdbot cron add \
+  --name "Daily Oura Health Report (Hybrid)" \
+  --cron "0 8 * * *" \
+  --tz "America/Los_Angeles" \
+  --session isolated \
+  --wake next-heartbeat \
+  --deliver \
+  --channel telegram \
+  --target "-5028088092" \
+  --message "Run the daily Oura health report with hybrid format: Execute bash /path/to/your/scripts/daily-oura-report-hybrid.sh"
+```
+
+### Weekly Sleep Report (Sunday 8:00 AM)
+```bash
+clawdbot cron add \
+  --name "Weekly Oura Sleep Report" \
+  --cron "0 8 * * 0" \
+  --tz "America/Los_Angeles" \
+  --session isolated \
+  --wake next-heartbeat \
+  --deliver \
+  --channel telegram \
+  --target "-5028088092" \
+  --message "Run weekly Oura sleep report: bash /path/to/your/oura-weekly-sleep-alert.sh"
+```
+
+### Daily Obsidian Note (8:15 AM)
+```bash
+clawdbot cron add \
+  --name "Daily Obsidian Note" \
+  --cron "15 8 * * *" \
+  --tz "America/Los_Angeles" \
+  --session isolated \
+  --wake next-heartbeat \
+  --message "Create daily Obsidian note with Oura data. Run: source /path/to/venv/bin/activate && python /path/to/daily-note.py"
+```
+
+**Note:** Replace `/path/to/your/` with your actual paths and `-5028088092` with your Telegram channel/group ID.
