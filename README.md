@@ -90,6 +90,32 @@ python scripts/weekly_report.py --days 30
 python scripts/alerts.py --days 7 --readiness 60 --efficiency 80 --telegram
 ```
 
+### Generate Hybrid Morning Briefing
+
+```bash
+# Daily hybrid report (morning briefing + 7-day trends)
+python scripts/oura_briefing.py --format hybrid
+```
+
+**Example hybrid output:**
+```
+🌅 *Morning Briefing — Jan 22*
+────────────────────────
+💤 *Sleep*: 6h 47m (↑75min vs avg) ⚠️
+⚡ *Readiness*: 80 (stable) ✅
+*Drivers*: recovery_index, body_temperature
+*Recovery*: 🟡 YELLOW
+*Rec*: Moderate day. Avoid heavy training.
+
+*📊 7-Day Trends*
+────────────────────────
+*Sleep Score*: `89.5` ↓
+*Readiness*: `77.1` ↑
+• *7.3h* sleep • *89.7%* eff • *21ms* HRV
+
+*Recent*: 01-20 → `87.4`/`73` • 01-21 → `90.4`/`80`
+```
+
 ### Baseline & Comparison Analysis
 
 ```bash
