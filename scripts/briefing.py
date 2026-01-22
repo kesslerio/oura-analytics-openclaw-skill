@@ -458,3 +458,49 @@ def _trend_arrow(trend: float) -> str:
         return "↓"  # Trending down
     else:
         return "→"  # Stable
+
+
+if __name__ == "__main__":
+    import argparse
+    from oura_api import OuraClient
+    from schema import create_night_record
+
+    parser = argparse.ArgumentParser(description="Oura Morning Briefing")
+    parser.add_argument("--date", help="Date (YYYY-MM-DD, default: yesterday)")
+    parser.add_argument("--format", choices=["brief", "hybrid", "json"], default="hybrid")
+    parser.add_argument("--token", help="Oura API token")
+    args = parser.parse_args()
+
+    # Default to yesterday
+    if args.date:
+        target_date = args.date
+    else:
+        target_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    try:
+        client = OuraClient(args.token)
+        sleep_data = client.get_sleep(target_date, target_date)
+        readiness_data = client.get_readiness(target_date, target_date)
+
+        if not sleep_data:
+            print(f"No data for {target_date}")
+            sys.exit(1)
+
+        # Build NightRecord from API response using schema normalizer
+        night = create_night_record(
+            date=target_date,
+            sleep=sleep_data[0] if sleep_data else None,
+            readiness=readiness_data[0] if readiness_data else None
+        )
+
+        if args.format == "json":
+            import json
+            print(json.dumps(format_json_briefing(night), indent=2))
+        elif args.format == "brief":
+            print(format_brief_briefing(night))
+        else:
+            print(format_hybrid_briefing(night))
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)

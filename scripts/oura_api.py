@@ -531,7 +531,8 @@ def main():
 
         elif args.command == "summary":
             sleep = client.get_sleep(start_date, end_date)
-            analyzer = OuraAnalyzer(sleep)
+            readiness = client.get_readiness(start_date, end_date)
+            analyzer = OuraAnalyzer(sleep, readiness)
             summary = analyzer.summary()
             output = format_output(summary, output_mode)
             if output:
