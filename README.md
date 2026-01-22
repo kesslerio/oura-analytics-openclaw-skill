@@ -1,7 +1,7 @@
 # Oura Analytics - Clawdbot Skill
 
-[![Clawdbot Official](https://img.shields.io/badge/clawdbot-official%20skill-blue)](https://github.com/cktang88/clawdbot)
-[![ClawdHub](https://img.shields.io/badge/clawdhub-production-green)](https://clawdhub.com)
+[![Clawdbot Community Skill](https://img.shields.io/badge/clawdbot-community%20skill-blue)](https://github.com/clawdbot/clawdbot)
+[![ClawdHub Listing Pending](https://img.shields.io/badge/clawdhub-listing%20pending-lightgrey)](https://clawdhub.com)
 
 **Production-grade Oura Ring data integration for Clawdbot**  
 Fetch sleep scores, readiness, activity, HRV, and trends from Oura Cloud API. Generate automated health reports and trigger-based alerts.
@@ -45,7 +45,7 @@ echo 'OURA_API_TOKEN="your_token_here"' >> ~/.config/systemd/user/secrets.conf
 
 ```bash
 git clone https://github.com/kesslerio/oura-analytics-clawdbot-skill.git ~/.clawdbot/skills/oura-analytics
-pip install python-telegram-bot
+pip install -r requirements.txt
 ```
 
 ### 3. Add to Clawdbot's TOOLS.md
@@ -251,19 +251,6 @@ report = reporter.generate_report(report_type="weekly", days=7)
 print(json.dumps(report, indent=2))
 ```
 
-## Telegram Bot Integration
-
-Optional: Run as standalone Telegram bot for daily notifications.
-
-```bash
-# Set bot token
-echo 'TELEGRAM_BOT_TOKEN="your_bot_token"' >> ~/.config/systemd/user/secrets.conf
-echo 'TELEGRAM_CHAT_ID="your_chat_id"' >> ~/.config/systemd/user/secrets.conf
-
-# Run bot
-python scripts/telegram_bot.py
-```
-
 ## Metrics Reference
 
 | Metric | Description | Range |
@@ -283,7 +270,6 @@ See `references/metrics.md` for full definitions.
 - **`scripts/oura_api.py`** - Oura Cloud API v2 client with OuraAnalyzer and OuraReporter classes
 - **`scripts/alerts.py`** - Threshold-based alerting CLI
 - **`scripts/weekly_report.py`** - Weekly report generator
-- **`scripts/telegram_bot.py`** - Optional Telegram bot integration
 - **`scripts/data_manager.py`** - Data storage and privacy controls
 - **`scripts/oura_data.py`** - Data management CLI
 - **`scripts/schema.py`** - Canonical data structures with unit normalization
