@@ -413,4 +413,4 @@ Developed by [@kesslerio](https://github.com/kesslerio) • Part of the [ClawdHu
 
 ## License
 
-MIT
+Apache 2.0
