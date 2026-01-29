@@ -78,7 +78,7 @@ To rotate your token:
 ## Privacy Best Practices
 
 **For Clawdbot Integration:**
-1. Store `OURA_API_TOKEN` in `~/.clawdbot/.env` (git-ignored)
+1. Store `OURA_API_TOKEN` in `~/.moltbot/.env` (git-ignored)
 2. Use `--format brief` or `--format alert` to minimize data in logs
 3. Use `--format silent` for cron jobs (exit code only, no output)
 4. Never share cache files publicly (contains your health data)

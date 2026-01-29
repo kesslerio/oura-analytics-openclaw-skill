@@ -87,10 +87,10 @@ def format_alert_message(alerts):
 def send_telegram(message, chat_id=None, bot_token=None):
     """Send to Telegram using urllib"""
     chat_id = chat_id or os.environ.get("TELEGRAM_CHAT_ID")
-    bot_token = bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
+    bot_token = bot_token or os.environ.get("KESSLER_TELEGRAM_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN")
 
     if not chat_id or not bot_token:
-        print("TELEGRAM_CHAT_ID or TELEGRAM_BOT_TOKEN not set")
+        print("TELEGRAM_CHAT_ID or KESSLER_TELEGRAM_BOT_TOKEN not set")
         return False
 
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
