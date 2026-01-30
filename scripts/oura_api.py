@@ -24,7 +24,7 @@ SKILL_DIR = Path(__file__).parent.parent
 
 
 class OutputMode(Enum):
-    """Output format modes for Clawdbot integration"""
+    """Output format modes for OpenClaw integration"""
     BRIEF = "brief"      # 5-8 line human summary
     JSON = "json"        # Full structured data (default)
     ALERT = "alert"      # Only if something needs attention

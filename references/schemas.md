@@ -6,7 +6,7 @@ The CLI supports multiple output formats via `--format` flag:
 
 | Format | Description | Use Case |
 |--------|-------------|----------|
-| `json` | Full structured data (default) | API integration, Clawdbot parsing |
+| `json` | Full structured data (default) | API integration, OpenClaw parsing |
 | `brief` | 5-8 line human summary | Quick checks, Telegram messages |
 | `alert` | Warnings only (empty if OK) | Health monitoring, alerts |
 | `silent` | No output (exit code only) | Cron jobs, background tasks |

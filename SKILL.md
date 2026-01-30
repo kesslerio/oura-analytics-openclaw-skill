@@ -1,7 +1,7 @@
 ---
 name: oura-analytics
 description: Oura Ring data integration and analytics. Fetch sleep scores, readiness, activity, HRV, and trends from the Oura Cloud API. Generate automated reports, correlations with productivity, and trigger-based alerts for low recovery days. Requires OURA_API_TOKEN (get at cloud.ouraring.com).
-metadata: {"moltbot":{"requires":{"bins":["python3"],"env":["OURA_API_TOKEN"]},"homepage":"https://github.com/kesslerio/oura-analytics-moltbot-skill"}}
+metadata: {"openclaw":{"requires":{"bins":["python3"],"env":["OURA_API_TOKEN"]},"homepage":"https://github.com/kesslerio/oura-analytics-openclaw-skill"}}
 ---
 
 # Oura Analytics
@@ -93,11 +93,11 @@ Optional (used for alerts/reports/timezone/output):
 
 ## Automation (Cron Jobs)
 
-Cron jobs are configured in Moltbot's gateway, not in this repo. Add these to your Moltbot setup:
+Cron jobs are configured in OpenClaw's gateway, not in this repo. Add these to your OpenClaw setup:
 
 ### Daily Morning Briefing (8:00 AM)
 ```bash
-moltbot cron add \
+openclaw cron add \
   --name "Daily Oura Health Report (Hybrid)" \
   --cron "0 8 * * *" \
   --tz "America/Los_Angeles" \
@@ -111,7 +111,7 @@ moltbot cron add \
 
 ### Weekly Sleep Report (Sunday 8:00 AM)
 ```bash
-moltbot cron add \
+openclaw cron add \
   --name "Weekly Oura Sleep Report" \
   --cron "0 8 * * 0" \
   --tz "America/Los_Angeles" \
@@ -125,7 +125,7 @@ moltbot cron add \
 
 ### Daily Obsidian Note (8:15 AM)
 ```bash
-moltbot cron add \
+openclaw cron add \
   --name "Daily Obsidian Note" \
   --cron "15 8 * * *" \
   --tz "America/Los_Angeles" \
