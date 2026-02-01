@@ -3,6 +3,13 @@
 Daily Note Generator for Obsidian
 Runs via OpenClaw cron at 8:15am Pacific
 Creates /home/art/Obsidian/01-Daily/YYYY-MM-DD.md with Oura data
+
+Requirements:
+    - OURA_API_TOKEN environment variable must be set
+    - oura_api.py must be in the same directory (scripts/)
+
+Usage:
+    python daily-note.py
 """
 
 import os
@@ -10,8 +17,8 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Add oura-analytics to path
-sys.path.insert(0, "/home/art/clawd/skills/oura-analytics/scripts")
+# Add this script's directory to path for oura_api import
+sys.path.insert(0, str(Path(__file__).parent))
 
 from oura_api import OuraClient
 
@@ -20,42 +27,52 @@ OURA_TOKEN = os.environ.get("OURA_API_TOKEN")
 
 
 def get_oura_data():
-    """Fetch today's Oura data (actually yesterday's sleep since we just woke up)"""
+    """Fetch yesterday's sleep data (since we just woke up) and today's readiness."""
     if not OURA_TOKEN:
+        print("Warning: OURA_API_TOKEN not set", file=sys.stderr)
         return {"sleep_score": "N/A", "readiness": "N/A", "hours": "N/A"}
     
     try:
         client = OuraClient(OURA_TOKEN)
         
-        # Get last night's sleep (yesterday's date in Oura)
         today = datetime.now().strftime("%Y-%m-%d")
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         
-        # Get sleep data
-        sleep = client.get_recent_sleep(days=2)
-        if sleep:
-            latest = sleep[-1] if sleep else {}
-            duration_sec = latest.get("total_sleep_duration", 0)
-            hours = round(duration_sec / 3600, 1) if duration_sec else "N/A"
-            
-            # Calculate sleep score from efficiency + duration
-            efficiency = latest.get("efficiency", 0)
-            if efficiency and duration_sec:
-                eff_score = min(efficiency, 100)
-                dur_score = min((duration_sec / 3600) / 8 * 100, 100)
-                sleep_score = round((eff_score * 0.6) + (dur_score * 0.4))
-            else:
-                sleep_score = latest.get("score", "N/A")
-        else:
-            sleep_score = "N/A"
-            hours = "N/A"
+        # Get sleep data for last 3 days to ensure we have yesterday's
+        sleep_records = client.get_recent_sleep(days=3)
         
-        # Get readiness
-        readiness_data = client.get_readiness(yesterday, today)
-        if readiness_data:
-            readiness = readiness_data[-1].get("score", "N/A")
-        else:
-            readiness = "N/A"
+        # Find sleep record for yesterday (by date, not by position)
+        sleep_score = "N/A"
+        hours = "N/A"
+        if sleep_records:
+            for record in sleep_records:
+                record_date = record.get("day") or record.get("date", "")
+                if record_date == yesterday:
+                    duration_sec = record.get("total_sleep_duration", 0)
+                    hours = round(duration_sec / 3600, 1) if duration_sec else "N/A"
+                    
+                    # Calculate sleep score from efficiency + duration
+                    efficiency = record.get("efficiency", 0)
+                    if efficiency and duration_sec:
+                        eff_score = min(efficiency, 100)
+                        dur_score = min((duration_sec / 3600) / 8 * 100, 100)
+                        sleep_score = round((eff_score * 0.6) + (dur_score * 0.4))
+                    else:
+                        sleep_score = record.get("score", "N/A")
+                    break
+        
+        # Get readiness for today (by date, not by position)
+        readiness = "N/A"
+        readiness_records = client.get_readiness(yesterday, today)
+        if readiness_records:
+            for record in readiness_records:
+                record_date = record.get("day") or record.get("date", "")
+                if record_date == today:
+                    readiness = record.get("score", "N/A")
+                    break
+            # Fall back to most recent if today not found
+            if readiness == "N/A" and readiness_records:
+                readiness = readiness_records[-1].get("score", "N/A")
         
         return {
             "sleep_score": sleep_score,
@@ -68,7 +85,7 @@ def get_oura_data():
 
 
 def create_daily_note():
-    """Create today's daily note"""
+    """Create today's daily note in Obsidian."""
     today = datetime.now()
     date_str = today.strftime("%Y-%m-%d")
     date_display = today.strftime("%A, %B %d, %Y")
