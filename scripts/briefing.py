@@ -13,12 +13,12 @@ Generates concise, actionable daily briefings with:
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Add scripts dir to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from schema import NightRecord, SleepRecord, ReadinessRecord, ActivityRecord
+from schema import NightRecord, SleepRecord, ReadinessRecord
 
 
 class Baseline:
@@ -393,7 +393,7 @@ def format_hybrid_briefing(
     # === SECTION 2: Trend Snapshot ===
     if week_data:
         lines.append("")
-        lines.append(f"*📊 7-Day Trends*")
+        lines.append("*📊 7-Day Trends*")
         lines.append("─" * 24)
         
         # 7-day averages with delta arrows

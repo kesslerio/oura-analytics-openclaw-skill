@@ -14,7 +14,6 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from data_manager import OuraDataManager, format_size
@@ -64,18 +63,18 @@ def main():
                 print(f"    Size: {format_size(data['size_bytes'])}")
                 print(f"    Date range: {data['oldest_date']} to {data['newest_date']}")
             
-            print(f"\nEvents:")
+            print("\nEvents:")
             print(f"  Exists: {info['events']['exists']}")
             if info['events']['exists']:
                 print(f"  Size: {format_size(info['events']['size_bytes'])}")
                 print(f"  Count: {info['events']['count']}")
             
-            print(f"\nConfig:")
+            print("\nConfig:")
             print(f"  Exists: {info['config']['exists']}")
             if info['config']['exists']:
                 print(f"  Size: {format_size(info['config']['size_bytes'])}")
             
-            print(f"\nAlert state:")
+            print("\nAlert state:")
             print(f"  Exists: {info['alert_state']['exists']}")
             if info['alert_state']['exists']:
                 print(f"  Size: {format_size(info['alert_state']['size_bytes'])}")

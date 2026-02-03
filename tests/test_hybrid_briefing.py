@@ -97,13 +97,13 @@ class TestHybridBriefing:
         assert len(lines) <= 16  # Allow for full hybrid format with all details
         
         # Check key elements are present
-        assert "🌤" in output
-        assert "Readiness:" in output
-        assert "Recovery Status:" in output
-        assert "Recommendation:" in output
-        assert "7-day avg" in output
-        assert "Recent Sleep:" in output
-        assert "Recent Readiness:" in output
+        assert "🌅" in output
+        assert "*Readiness*:" in output
+        assert "*Recovery*:" in output
+        assert "*Rec*:" in output
+        assert "7-Day Trends" in output
+        assert "*Recent*:" in output
+        assert "*Recent*:" in output
     
     def test_format_hybrid_without_week_data(self):
         """Test hybrid format works without week data (briefing only)."""
@@ -114,8 +114,8 @@ class TestHybridBriefing:
         
         # Should contain morning briefing
         assert "Morning Briefing" in lines[0]
-        assert "🌤" in output
-        assert "Readiness:" in output
+        assert "🌅" in output
+        assert "*Readiness*:" in output
         
         # Should NOT contain trend snapshot
         assert "Trend Snapshot" not in output
