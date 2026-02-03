@@ -85,7 +85,6 @@ def main():
         analyzer = DriverAnalyzer(baseline_dict)
         
         # Analyze drivers
-        sleep_drivers = analyzer.analyze_sleep_drivers(sleep)
         readiness_drivers = analyzer.analyze_readiness_drivers(sleep, readiness)
         
         readiness_score = readiness.get("score", 0) if readiness else 0
