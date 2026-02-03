@@ -101,7 +101,7 @@ class TestHybridBriefing:
         assert "*Readiness*:" in output
         assert "*Recovery*:" in output
         assert "*Rec*:" in output
-        assert "7-day avg" in output
+        assert "7-Day Trends" in output
         assert "Recent Sleep:" in output
         assert "Recent Readiness:" in output
     
