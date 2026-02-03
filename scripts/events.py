@@ -19,7 +19,7 @@ import statistics
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 
 # Add scripts directory to path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -318,7 +318,7 @@ def main():
             print(f"Error: {result['error']}")
             sys.exit(1)
         
-        print(f"📊 Results:")
+        print("📊 Results:")
         print(f"   Tag: {result['tag']}")
         print(f"   Metric: {result['metric']}")
         print(f"   Event days: {result['event_mean']} (n={result['event_sample_size']})")
