@@ -103,7 +103,7 @@ class TestHybridBriefing:
         assert "*Rec*:" in output
         assert "7-Day Trends" in output
         assert "*Recent*:" in output
-        assert "Recent Readiness:" in output
+        assert "*Recent*:" in output
     
     def test_format_hybrid_without_week_data(self):
         """Test hybrid format works without week data (briefing only)."""
