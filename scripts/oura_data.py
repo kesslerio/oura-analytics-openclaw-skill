@@ -14,7 +14,6 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from data_manager import OuraDataManager, format_size
