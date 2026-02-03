@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
+# datetime import removed - not used
 
 
 class OuraCache:
