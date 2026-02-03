@@ -471,11 +471,11 @@ if __name__ == "__main__":
     parser.add_argument("--token", help="Oura API token")
     args = parser.parse_args()
 
-    # Default to yesterday
+    # Default to today (same-day briefing)
     if args.date:
         target_date = args.date
     else:
-        target_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+        target_date = datetime.now().strftime("%Y-%m-%d")
 
     try:
         client = OuraClient(args.token)
