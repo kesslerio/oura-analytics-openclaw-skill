@@ -311,7 +311,6 @@ def main():
         )
         
         # Calculate current averages
-        readiness_by_day = {r.get("day"): r for r in current_readiness}
         
         current_sleep_scores = [calculate_sleep_score(s) for s in current_sleep if calculate_sleep_score(s) > 0]
         current_readiness_scores = [r.get("score") for r in current_readiness if r.get("score")]
