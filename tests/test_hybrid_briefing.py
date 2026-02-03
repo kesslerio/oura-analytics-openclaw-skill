@@ -98,8 +98,8 @@ class TestHybridBriefing:
         
         # Check key elements are present
         assert "🌅" in output
-        assert "Readiness:" in output
-        assert "Recovery Status:" in output
+        assert "*Readiness*:" in output
+        assert "*Recovery*:" in output
         assert "Recommendation:" in output
         assert "7-day avg" in output
         assert "Recent Sleep:" in output
@@ -115,7 +115,7 @@ class TestHybridBriefing:
         # Should contain morning briefing
         assert "Morning Briefing" in lines[0]
         assert "🌅" in output
-        assert "Readiness:" in output
+        assert "*Readiness*:" in output
         
         # Should NOT contain trend snapshot
         assert "Trend Snapshot" not in output
