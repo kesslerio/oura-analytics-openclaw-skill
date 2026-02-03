@@ -97,7 +97,7 @@ class TestHybridBriefing:
         assert len(lines) <= 16  # Allow for full hybrid format with all details
         
         # Check key elements are present
-        assert "🌥" in output
+        assert "🌅" in output
         assert "Readiness:" in output
         assert "Recovery Status:" in output
         assert "Recommendation:" in output
@@ -114,7 +114,7 @@ class TestHybridBriefing:
         
         # Should contain morning briefing
         assert "Morning Briefing" in lines[0]
-        assert "🌥" in output
+        assert "🌅" in output
         assert "Readiness:" in output
         
         # Should NOT contain trend snapshot
