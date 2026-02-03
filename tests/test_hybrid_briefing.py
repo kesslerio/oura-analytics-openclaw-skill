@@ -91,13 +91,13 @@ class TestHybridBriefing:
         assert "Morning Briefing" in lines[0]
         
         # Should contain trend snapshot section
-        assert "Trend Snapshot" in output
+        assert "*📊 7-Day Trends*" in output
         
         # Should be within reasonable line count (≤15 for hybrid with week data)
         assert len(lines) <= 16  # Allow for full hybrid format with all details
         
         # Check key elements are present
-        assert "Sleep:" in output
+        assert "🌤" in output
         assert "Readiness:" in output
         assert "Recovery Status:" in output
         assert "Recommendation:" in output
@@ -114,7 +114,7 @@ class TestHybridBriefing:
         
         # Should contain morning briefing
         assert "Morning Briefing" in lines[0]
-        assert "Sleep:" in output
+        assert "🌤" in output
         assert "Readiness:" in output
         
         # Should NOT contain trend snapshot
@@ -128,7 +128,7 @@ class TestHybridBriefing:
         output = format_hybrid_briefing(night, None, week_data)
         
         # Should contain driver analysis
-        assert "Driven by:" in output
+        assert "*Drivers*" in output
     
     def test_format_hybrid_recent_sleep_readiness(self):
         """Test hybrid format shows last 2 days properly."""
@@ -138,8 +138,8 @@ class TestHybridBriefing:
         output = format_hybrid_briefing(night, None, week_data)
         
         # Should show MM-DD format dates
-        assert "01-19:" in output
-        assert "01-20:" in output
+        assert "01-19" in output
+        assert "01-20" in output
         # Should show scores
         assert "93" in output
         assert "85" in output

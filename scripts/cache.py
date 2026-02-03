@@ -2,6 +2,7 @@
 """Simple file-based cache for Oura API data."""
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 from datetime import datetime
@@ -13,7 +14,12 @@ class OuraCache:
     def __init__(self, cache_dir: Optional[Path] = None):
         """Initialize cache with optional custom directory."""
         if cache_dir is None:
-            cache_dir = Path.home() / ".oura-analytics" / "cache"
+            # Check environment variable first
+            env_cache_dir = os.environ.get("OURA_CACHE_DIR")
+            if env_cache_dir:
+                cache_dir = Path(env_cache_dir)
+            else:
+                cache_dir = Path.home() / ".oura-analytics" / "cache"
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
