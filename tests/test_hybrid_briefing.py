@@ -102,7 +102,7 @@ class TestHybridBriefing:
         assert "*Recovery*:" in output
         assert "*Rec*:" in output
         assert "7-Day Trends" in output
-        assert "Recent Sleep:" in output
+        assert "*Recent*:" in output
         assert "Recent Readiness:" in output
     
     def test_format_hybrid_without_week_data(self):
