@@ -19,7 +19,9 @@ class OuraCache:
             if env_cache_dir:
                 cache_dir = Path(env_cache_dir)
             else:
-                cache_dir = Path.home() / ".oura-analytics" / "cache"
+                # XDG-compliant default: ~/.cache/oura-analytics/
+                xdg_cache = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
+                cache_dir = Path(xdg_cache) / "oura-analytics"
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
