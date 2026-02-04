@@ -45,7 +45,11 @@ def main():
         client = OuraClient(args.token)
         
         # Fetch target day data
-        sleep_data = client.get_sleep(target_date, target_date)
+        # Try daily_sleep first (has scores), fall back to detailed sleep
+        sleep_data = client.get_daily_sleep(target_date, target_date)
+        if not sleep_data:
+            # Fall back to detailed sleep endpoint
+            sleep_data = client.get_sleep(target_date, target_date)
         readiness_data = client.get_readiness(target_date, target_date)
         
         if not sleep_data:
