@@ -2,7 +2,7 @@
 """
 Daily Note Generator for Obsidian
 Runs via OpenClaw cron at 8:15am Pacific
-Creates /home/art/Obsidian/01-Daily/YYYY-MM-DD.md with Oura data
+Creates /home/art/Obsidian/01-TODOs/Daily/YYYY-MM-DD.md with Oura data
 
 Requirements:
     - OURA_API_TOKEN environment variable must be set
@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from oura_api import OuraClient
 
-OBSIDIAN_DAILY = Path("/home/art/Obsidian/01-Daily")
+OBSIDIAN_DAILY = Path("/home/art/Obsidian/01-TODOs/Daily")
 OURA_TOKEN = os.environ.get("OURA_API_TOKEN")
 
 
