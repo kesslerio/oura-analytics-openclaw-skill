@@ -1,0 +1,42 @@
+{
+  "sleep": [
+    {
+      "day": "2026-01-15",
+      "average_hrv": 30,
+      "lowest_heart_rate": 64,
+      "efficiency": 82,
+      "total_sleep_duration": 24600
+    },
+    {
+      "day": "2026-01-16",
+      "average_hrv": 46,
+      "lowest_heart_rate": 56,
+      "efficiency": 90,
+      "total_sleep_duration": 27000
+    }
+  ],
+  "readiness": [
+    {
+      "day": "2026-01-15",
+      "score": 68,
+      "contributors": {
+        "hrv_balance": 60,
+        "resting_heart_rate": 58,
+        "recovery_index": 62,
+        "sleep_balance": 70,
+        "previous_night": 66
+      }
+    },
+    {
+      "day": "2026-01-16",
+      "score": 82,
+      "contributors": {
+        "hrv_balance": 84,
+        "resting_heart_rate": 82,
+        "recovery_index": 80,
+        "sleep_balance": 88,
+        "previous_night": 86
+      }
+    }
+  ]
+}

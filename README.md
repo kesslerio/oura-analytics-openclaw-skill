@@ -13,6 +13,7 @@ Fetch sleep scores, readiness, activity, HRV, and trends from Oura Cloud API. Ge
 ✅ **Oura Cloud API Integration** - Personal Access Token authentication  
 ✅ **Sleep Analytics** - Score, duration, efficiency, REM/deep stages  
 ✅ **Readiness Tracking** - Recovery score, HRV balance, temperature  
+✅ **Stress Tracking** - Daily status + baseline trend, weekly stress summaries  
 ✅ **Activity Metrics** - Steps, calories, MET minutes  
 ✅ **Trend Analysis** - Moving averages, correlations, anomaly detection  
 ✅ **Automated Alerts** - Low readiness/sleep notifications via Telegram
@@ -271,6 +272,7 @@ print(json.dumps(report, indent=2))
 |--------|-------------|-------|
 | **Sleep Score** | Overall sleep quality | 0-100 |
 | **Readiness Score** | Recovery readiness | 0-100 |
+| **Stress Score** | Physiological stress load (direct or derived proxy) | 0-100 |
 | **HRV Balance** | Heart rate variability | -3 to +3 |
 | **Sleep Efficiency** | Time asleep / time in bed | 0-100% |
 | **REM Sleep** | REM stage duration | hours |

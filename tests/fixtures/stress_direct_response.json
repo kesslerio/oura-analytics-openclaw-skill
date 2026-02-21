@@ -1,0 +1,5 @@
+[
+  {"day": "2026-01-15", "stress_score": 62, "day_summary": "stressed"},
+  {"day": "2026-01-16", "stress_score": 38, "day_summary": "restored"},
+  {"day": "2026-01-17", "stress_score": 71, "day_summary": "high_stress"}
+]
