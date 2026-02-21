@@ -238,6 +238,10 @@ class OuraClient:
         """Fetch activity data"""
         return self._get_with_cache("daily_activity", start_date, end_date)
 
+    def get_stress(self, start_date=None, end_date=None):
+        """Fetch daily stress data (if available for account/API scope)."""
+        return self._get_with_cache("daily_stress", start_date, end_date)
+
     def get_hrv(self, start_date=None, end_date=None):
         """Fetch HRV data"""
         return self._request("hrv", start_date, end_date)

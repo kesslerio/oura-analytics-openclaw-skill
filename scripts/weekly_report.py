@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from oura_api import OuraClient
+from stress import summarize_weekly_stress
 
 
 def seconds_to_hours(seconds):
@@ -32,12 +33,13 @@ def calculate_sleep_score(day):
     return round((eff_score * 0.6) + (dur_score * 0.4), 1)
 
 
-def analyze_week(sleep_data, readiness_data=None):
+def analyze_week(sleep_data, readiness_data=None, stress_data=None):
     """Analyze weekly data
 
     Args:
         sleep_data: List of sleep records from get_sleep()
         readiness_data: List of readiness records from get_readiness() (optional for backwards compatibility)
+        stress_data: List of stress records from get_stress() (optional)
     """
     if not sleep_data:
         return None
@@ -119,7 +121,8 @@ def analyze_week(sleep_data, readiness_data=None):
         "best_day": sleep_data[scores.index(max(scores))].get("day") if sleep_data and scores else None,
         "worst_day": sleep_data[scores.index(min(scores))].get("day") if sleep_data and scores else None,
         "days_tracked": len(sleep_data),
-        "last_2_days": last_2_days
+        "last_2_days": last_2_days,
+        "stress_summary": summarize_weekly_stress(sleep_data, readiness_data, stress_data),
     }
 
 
@@ -163,6 +166,18 @@ def format_telegram_message(week_data, period):
 
     msg += f"{emoji['efficiency']} Efficiency: *{week_data['avg_efficiency']}%*\n"
     msg += f"{emoji['duration']} Avg Sleep: *{week_data['avg_duration']}h*\n"
+
+    stress = week_data.get("stress_summary", {})
+    if stress and stress.get("avg") is not None:
+        trend = stress.get("trend", 0)
+        msg += f"🧠 Stress: *{stress['avg']}*/100 ({stress.get('status', 'UNKNOWN')}) {trend_emoji(trend)}\n"
+        msg += f"   Best: {stress.get('best_day')} • Worst: {stress.get('worst_day')}\n"
+        source_suffix = ""
+        if stress.get("derived_days"):
+            source_suffix = f" ({stress.get('derived_days')} derived day(s))"
+        msg += f"   Trend: {stress.get('trend_direction', 'unknown')}{source_suffix}\n"
+    else:
+        msg += "🧠 Stress: *N/A* (insufficient data)\n"
 
     # Last 2 days
     last_2_days = week_data.get('last_2_days', [])
@@ -221,7 +236,11 @@ def main():
         client = OuraClient(args.token)
         sleep = client.get_sleep(start_date, end_date)
         readiness = client.get_readiness(start_date, end_date)
-        week_data = analyze_week(sleep, readiness)
+        try:
+            stress = client.get_stress(start_date, end_date)
+        except Exception:
+            stress = []
+        week_data = analyze_week(sleep, readiness, stress)
         
         if not week_data:
             print("No data available")
@@ -239,6 +258,20 @@ def main():
         print(f"   Readiness: {week_data['avg_readiness']} {trend_symbol(readiness_trend)} ({'+' if readiness_trend > 0 else ''}{readiness_trend})")
         print(f"   Efficiency: {week_data['avg_efficiency']}%")
         print(f"   Avg Duration: {week_data['avg_duration']}h")
+        stress_summary = week_data.get("stress_summary", {})
+        if stress_summary and stress_summary.get("avg") is not None:
+            stress_trend = stress_summary.get("trend", 0)
+            source_suffix = ""
+            if stress_summary.get("derived_days"):
+                source_suffix = f" ({stress_summary.get('derived_days')} derived day(s))"
+            print(
+                f"   Stress: {stress_summary['avg']}/100 ({stress_summary.get('status')}) "
+                f"{trend_symbol(stress_trend)} ({'+' if stress_trend > 0 else ''}{stress_trend})"
+                f"{source_suffix}"
+            )
+            print(f"   Stress Best/Worst: {stress_summary.get('best_day')} / {stress_summary.get('worst_day')}")
+        else:
+            print("   Stress: N/A (insufficient data)")
 
         # Last 2 days
         last_2 = week_data.get('last_2_days', [])

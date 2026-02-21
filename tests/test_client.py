@@ -38,14 +38,14 @@ class TestOuraClient:
 
     def test_client_init_with_token(self):
         """Test client initialization with explicit token."""
-        client = OuraClient(token="test_token_123")
+        client = OuraClient(token="test_token_123", use_cache=False)
         assert client.token == "test_token_123"
         assert "Bearer test_token_123" in client.headers["Authorization"]
 
     def test_client_init_from_env(self, monkeypatch):
         """Test client initialization from OURA_API_TOKEN env var."""
         monkeypatch.setenv("OURA_API_TOKEN", "env_token_456")
-        client = OuraClient()
+        client = OuraClient(use_cache=False)
         assert client.token == "env_token_456"
 
     def test_client_init_missing_token(self):
@@ -66,7 +66,7 @@ class TestOuraClient:
         """Test that _request constructs URL correctly."""
         mock_urlopen.return_value = make_mock_response([{"day": "2026-01-15", "score": 80}])
 
-        client = OuraClient(token="test")
+        client = OuraClient(token="test", use_cache=False)
         result = client._request("sleep", "2026-01-01", "2026-01-15")
 
         assert len(result) == 1
@@ -82,7 +82,7 @@ class TestOuraClient:
         """Test get_sleep returns all data when no dates specified."""
         mock_urlopen.return_value = make_mock_response([{"day": "2026-01-10"}, {"day": "2026-01-11"}])
 
-        client = OuraClient(token="test")
+        client = OuraClient(token="test", use_cache=False)
         result = client.get_sleep()
 
         assert len(result) == 2
@@ -96,7 +96,7 @@ class TestOuraClient:
         """Test get_readiness method."""
         mock_urlopen.return_value = make_mock_response([{"day": "2026-01-15", "score": 75}])
 
-        client = OuraClient(token="test")
+        client = OuraClient(token="test", use_cache=False)
         result = client.get_readiness("2026-01-01", "2026-01-15")
 
         assert len(result) == 1
@@ -107,7 +107,7 @@ class TestOuraClient:
         """Test get_activity method."""
         mock_urlopen.return_value = make_mock_response([{"day": "2026-01-15", "score": 65}])
 
-        client = OuraClient(token="test")
+        client = OuraClient(token="test", use_cache=False)
         result = client.get_activity("2026-01-01", "2026-01-15")
 
         assert len(result) == 1
@@ -122,6 +122,6 @@ class TestOuraClient:
             401, "Unauthorized", {}, None
         )
 
-        client = OuraClient(token="test")
+        client = OuraClient(token="test", use_cache=False)
         with pytest.raises(Exception):
             client.get_sleep("2026-01-01", "2026-01-15")

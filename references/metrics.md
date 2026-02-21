@@ -55,3 +55,30 @@ balance = (activity_score + readiness_score + sleep_score) / 3
 | REM Sleep % | >20% of total | <15% |
 | HRV (RMSSD) | 40-80 ms | <30 or >100 |
 | Temperature | ±0.1°C | >0.3°C deviation |
+
+## Stress Tracking (Direct + Derived)
+
+- Stress score is normalized to `0-100` where lower is better (lower physiological strain).
+- `LOW`: `<= 40`
+- `MODERATE`: `41-65`
+- `HIGH`: `> 65`
+
+### Direct stress
+
+- Uses Oura direct stress fields when available (for example `stress_score` or stress status labels).
+- Report output labels this as `direct stress`.
+
+### Derived stress proxy (fallback)
+
+When direct stress fields are unavailable, reports derive a proxy stress score from available signals:
+
+- HRV vs baseline (`average_hrv`)
+- Resting HR vs baseline (`lowest_heart_rate`)
+- Readiness contributors (`hrv_balance`, `resting_heart_rate`, `recovery_index`, `sleep_balance`, `previous_night`)
+- Sleep efficiency (`efficiency`)
+
+### Caveats
+
+- Derived stress is a proxy, not Oura's native stress algorithm.
+- Baseline quality matters: sparse history can make trends noisy.
+- Missing HRV/RHR/contributor fields reduce confidence; output is labeled `derived proxy` or `unavailable`.

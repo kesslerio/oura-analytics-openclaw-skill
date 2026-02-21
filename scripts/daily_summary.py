@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from oura_api import OuraClient
 from drivers import DriverAnalyzer, format_drivers_report
 from baseline import build_baseline
+from stress import build_stress_day, calculate_stress_baseline, stress_trend_direction
 
 
 def format_hours(seconds: int) -> str:
@@ -51,10 +52,14 @@ def main():
             # Fall back to detailed sleep endpoint
             sleep_data = client.get_sleep(target_date, target_date)
         readiness_data = client.get_readiness(target_date, target_date)
+        try:
+            stress_data = client.get_stress(target_date, target_date)
+        except Exception:
+            stress_data = []
         
         if not sleep_data:
-            print(f"No sleep data for {target_date}")
-            sys.exit(1)
+            print(f"No sleep data for {target_date} — skipping daily summary")
+            sys.exit(0)
         
         sleep = sleep_data[0]
         readiness = readiness_data[0] if readiness_data else {}
@@ -71,6 +76,13 @@ def main():
             baseline_start.strftime("%Y-%m-%d"),
             baseline_end.strftime("%Y-%m-%d")
         )
+        try:
+            baseline_stress = client.get_stress(
+                baseline_start.strftime("%Y-%m-%d"),
+                baseline_end.strftime("%Y-%m-%d")
+            )
+        except Exception:
+            baseline_stress = []
         
         # Calculate baseline metrics
         baseline = build_baseline(baseline_sleep, baseline_readiness, args.baseline_days)
@@ -90,6 +102,21 @@ def main():
         
         # Analyze drivers
         readiness_drivers = analyzer.analyze_readiness_drivers(sleep, readiness)
+        baseline_hrv = baseline.hrv.mean if baseline.hrv else 40.0
+        baseline_rhr = baseline.rhr.mean if baseline.rhr else 60.0
+        stress_today = build_stress_day(
+            day=target_date,
+            sleep_record=sleep,
+            readiness_record=readiness,
+            stress_record=stress_data[0] if stress_data else None,
+            baseline_hrv=baseline_hrv,
+            baseline_rhr=baseline_rhr,
+        )
+        baseline_stress_score = calculate_stress_baseline(
+            baseline_sleep,
+            baseline_readiness,
+            baseline_stress,
+        )
         
         readiness_score = readiness.get("score", 0) if readiness else 0
         suggestion = analyzer.generate_suggestion(readiness_score, readiness_drivers)
@@ -117,6 +144,31 @@ def main():
             negative_drivers = [d for d in readiness_drivers if d.impact == "negative"]
             if negative_drivers:
                 print(format_drivers_report(negative_drivers, "   └─ Factors pulling down"))
+
+        # Stress block (always included)
+        print("\n🧠 Stress:")
+        stress_score = stress_today.get("score")
+        stress_status = stress_today.get("status", "UNKNOWN")
+        source = stress_today.get("source", "unavailable")
+        if stress_score is None:
+            print("   Status: UNKNOWN (insufficient signals)")
+            print("   Trend vs baseline: unavailable")
+            print("   Source: unavailable")
+        else:
+            delta_stress = None
+            if baseline_stress_score is not None:
+                delta_stress = round(stress_score - baseline_stress_score, 1)
+            delta_str = f"{delta_stress:+.1f}" if delta_stress is not None else "n/a"
+            trend = stress_trend_direction(delta_stress)
+            print(f"   Status: {stress_status} ({stress_score:.1f}/100)")
+            print(f"   Trend vs baseline: {trend} ({delta_str})")
+            if source == "derived":
+                print("   Source: derived proxy")
+                components = stress_today.get("components", [])
+                if components:
+                    print(f"   Signals: {', '.join(components[:3])}")
+            else:
+                print("   Source: direct stress")
         
         # Sleep metrics
         duration = sleep.get("total_sleep_duration")
