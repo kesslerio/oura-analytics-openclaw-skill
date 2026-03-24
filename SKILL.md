@@ -106,8 +106,10 @@ openclaw cron add \
   --deliver \
   --channel telegram \
   --target "<YOUR_TELEGRAM_CHAT_ID>" \
-  --message "Run the daily Oura health report with hybrid format: Execute bash /path/to/your/scripts/daily-oura-report-hybrid.sh"
+  --message "Run the daily Oura health report using the Lobster workflow daily-oura-hybrid.lobster, then summarize the result."
 ```
+
+Do not phrase Telegram-delivered cron prompts as "Execute bash ...". That can push the run into an approval-gated exec path that chat delivery cannot satisfy.
 
 ### Weekly Sleep Report (Sunday 8:00 AM)
 ```bash
@@ -120,7 +122,7 @@ openclaw cron add \
   --deliver \
   --channel telegram \
   --target "<YOUR_TELEGRAM_CHAT_ID>" \
-  --message "Run weekly Oura sleep report: bash /path/to/your/oura-weekly-sleep-alert.sh"
+  --message "Run the weekly Oura sleep report using the Lobster workflow weekly-sleep.lobster, then summarize the result."
 ```
 
 ### Daily Obsidian Note (8:15 AM)
